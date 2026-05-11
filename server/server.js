@@ -10,7 +10,7 @@ const dns = require('node:dns');
 dns.setDefaultResultOrder('ipv4first');
 
 const connectDB = require('./config/db');
-const initSocket = require('./config/socket'); // Убедись, что внутри initSocket используются пинги
+const initSocket = require('./config/socket');
 const setupSocketHandlers = require('./sockets/socketHandlers');
 
 const authRoutes = require('./routes/authRoutes');
@@ -20,11 +20,7 @@ const friendRoutes = require('./routes/friendRoutes');
 
 const app = express();
 const server = http.createServer(app);
-
-// 2. Инициализация Socket.io с защитой от разрывов Render
-// Если initSocket возвращает io, убедись, что настройки передаются там.
-// Если ты хочешь прописать их здесь, это выглядит так:
-const io = initSocket(server); 
+const io = initSocket(server);
 
 // Создаем папку uploads
 if (!fs.existsSync('uploads')) {
@@ -36,18 +32,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// 3. Более гибкий CORS
+// 2. Настройка CORS (разрешаем Render, Localhost и Electron)
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://gmessanger.onrender.com', // Замени на свой актуальный домен
-  'file://' // Для поддержки Electron
+  'https://gmessanger.onrender.com',
+  'file://'
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Разрешаем запросы без origin (например, мобильные приложения или curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -59,24 +53,30 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Подключаем БД
 connectDB();
 setupSocketHandlers(io);
 
-// Роуты API
-app.use('/api', authRoutes); // Хорошая практика - добавлять префикс /api
-app.use('/api', userRoutes);
-app.use('/api', chatRoutes);
-app.use('/api', friendRoutes);
+// 3. Роуты API (БЕЗ ПРЕФИКСА /api, чтобы не ломать фронтенд)
+app.use(authRoutes);
+app.use(userRoutes);
+app.use(chatRoutes);
+app.use(friendRoutes);
 
-// --- Настройка фронтенда для Production ---
+// 4. Настройка фронтенда для Production
 if (process.env.NODE_ENV === 'production') {
   const buildPath = path.resolve(__dirname, '../client-web/build');
   console.log('🌐 Serving static files from:', buildPath);
   
   app.use(express.static(buildPath));
 
-  // Исправленный роутинг для SPA
-  app.get(/^(?!\/api).+/, (req, res) => {
+  // Этот обработчик должен быть САМЫМ ПОСЛЕДНИМ
+  app.get('*', (req, res) => {
+    // Если запрос пришел на файл (картинку, скрипт), которого нет — отдаем 404
+    if (req.path.includes('.')) {
+      return res.status(404).send('Not found');
+    }
+    // Для всех остальных путей отдаем index.html (поддержка React Router)
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }
