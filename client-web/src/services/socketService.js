@@ -13,10 +13,11 @@ class SocketService {
       return this.socket;
     }
 
-    this.socket = io(API, {
+    this.socket = io(API || undefined, { // Если API пустая строка, используем undefined для авто-поиска хоста
       auth: { token },
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      transports: ['websocket', 'polling'] // Рекомендую добавить это для стабильности на Render
     });
 
     this.setupListeners();
