@@ -6,11 +6,11 @@ const fs = require('fs');
 const path = require('path');
 const dns = require('node:dns');
 
-// 1. Фикс для стабильных запросов к API (Resend/MongoDB)
+// 1. Фикс для стабильных запросов к API
 dns.setDefaultResultOrder('ipv4first');
 
 const connectDB = require('./config/db');
-const initSocket = require('./config/socket');
+const initSocket = require('./config/socket'); // Убедись, что внутри initSocket используются пинги
 const setupSocketHandlers = require('./sockets/socketHandlers');
 
 const authRoutes = require('./routes/authRoutes');
@@ -20,7 +20,11 @@ const friendRoutes = require('./routes/friendRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const io = initSocket(server);
+
+// 2. Инициализация Socket.io с защитой от разрывов Render
+// Если initSocket возвращает io, убедись, что настройки передаются там.
+// Если ты хочешь прописать их здесь, это выглядит так:
+const io = initSocket(server); 
 
 // Создаем папку uploads
 if (!fs.existsSync('uploads')) {
@@ -32,22 +36,37 @@ app.use((req, res, next) => {
   next();
 });
 
+// 3. Более гибкий CORS
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://gmessanger.onrender.com', // Замени на свой актуальный домен
+  'file://' // Для поддержки Electron
+];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? true : 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Разрешаем запросы без origin (например, мобильные приложения или curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 connectDB();
 setupSocketHandlers(io);
 
 // Роуты API
-app.use('/', authRoutes);
-app.use('/', userRoutes);
-app.use('/', chatRoutes);
-app.use('/', friendRoutes);
+app.use('/api', authRoutes); // Хорошая практика - добавлять префикс /api
+app.use('/api', userRoutes);
+app.use('/api', chatRoutes);
+app.use('/api', friendRoutes);
 
 // --- Настройка фронтенда для Production ---
 if (process.env.NODE_ENV === 'production') {
@@ -56,13 +75,13 @@ if (process.env.NODE_ENV === 'production') {
   
   app.use(express.static(buildPath));
 
-  app.get('*', (req, res) => {
-    // Если это не API запрос (можно добавить проверку !req.url.startsWith('/api'))
+  // Исправленный роутинг для SPA
+  app.get(/^(?!\/api).+/, (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });

@@ -13,11 +13,14 @@ class SocketService {
       return this.socket;
     }
 
-    this.socket = io(API || undefined, { // Если API пустая строка, используем undefined для авто-поиска хоста
+    // Используем API или undefined для автоматического определения хоста
+    this.socket = io(API || undefined, {
       auth: { token },
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      transports: ['websocket', 'polling'] // Рекомендую добавить это для стабильности на Render
+      reconnectionAttempts: 10, // Увеличили кол-во попыток для стабильности на Render
+      reconnectionDelay: 2000,   // Чуть больше задержка между попытками
+      transports: ['websocket', 'polling'], // Включаем оба транспорта
+      timeout: 20000,            // Таймаут соединения
+      autoConnect: true,
     });
 
     this.setupListeners();
@@ -40,6 +43,14 @@ class SocketService {
       if (err.message === 'Unauthorized' || err.message === 'invalid token') {
         localStorage.removeItem('token');
         window.dispatchEvent(new Event('authError'));
+      }
+    });
+
+    // Автоматическое переподключение к текущему чату при разрыве связи
+    this.socket.on('reconnect', () => {
+      if (this.currentChat) {
+        console.log(`🔄 Переподключение к чату: ${this.currentChat}`);
+        this.emit('joinChat', this.currentChat);
       }
     });
   }
@@ -75,18 +86,12 @@ class SocketService {
   }
 
   joinChat(chatId) {
-    // Выходим из предыдущего чата, только если он существует и отличается
     if (this.currentChat && this.currentChat !== chatId) {
-      console.log(`🚪 Выходим из комнаты ${this.currentChat}`);
       this.emit('leaveChat', this.currentChat);
     }
     
-    // Присоединяемся к новому чату, только если это не тот же чат
-    if (this.currentChat !== chatId) {
-      this.currentChat = chatId;
-      console.log(`🚪 Присоединяемся к комнате ${chatId}`);
-      this.emit('joinChat', chatId);
-    }
+    this.currentChat = chatId;
+    this.emit('joinChat', chatId);
   }
 
   sendMessage(data) {
@@ -94,4 +99,6 @@ class SocketService {
   }
 }
 
-export default new SocketService();
+// Исправляем eslint warning: сначала создаем экземпляр, потом экспортируем
+const socketServiceInstance = new SocketService();
+export default socketServiceInstance;

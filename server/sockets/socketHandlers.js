@@ -21,43 +21,57 @@ const setupSocketHandlers = (io) => {
   io.on('connection', async (socket) => {
     console.log('🔌 Пользователь подключился:', socket.userId);
 
+    // 1. При подключении сразу заходим в личную комнату
+    socket.join(socket.userId);
+
     try {
-      socket.join(socket.userId);
       await User.findByIdAndUpdate(socket.userId, { isOnline: true });
 
+      // Оповещаем друзей/чаты об онлайне
       const userChats = await Chat.find({ participants: socket.userId });
       userChats.forEach(chat => {
-        socket.to(chat._id.toString()).emit('userStatusUpdate', { 
+        // Используем io.to вместо socket.to для надежности
+        io.to(chat._id.toString()).emit('userStatusUpdate', { 
           userId: socket.userId, 
           isOnline: true 
         });
       });
     } catch (error) {
-      console.error('Ошибка при подключении сокета:', error);
+      console.error('Ошибка при статусе online:', error);
     }
 
+    // 2. Вход в чат (клиент вызывает это при открытии окна чата)
     socket.on('joinChat', (chatId) => {
+      console.log(`👤 Пользователь ${socket.userId} вошел в чат ${chatId}`);
       socket.join(chatId);
     });
 
+    // 3. Выход из чата
     socket.on('leaveChat', (chatId) => {
+      console.log(`👤 Пользователь ${socket.userId} покинул чат ${chatId}`);
       socket.leave(chatId);
     });
 
+    // 4. Отправка сообщения
     socket.on('sendMessage', async ({ chatId, text, fileUrl }) => {
       try {
+        // Простая валидация, чтобы не падал сервер
+        if (!chatId || (!text && !fileUrl)) return;
+
         let msg = await Message.create({ 
           chatId, 
           sender: socket.userId, 
           text, 
           fileUrl 
         });
+        
         const populatedMsg = await msg.populate('sender', 'username avatarUrl displayName');
 
-        // Обновляем время чата в БД
-        Chat.findByIdAndUpdate(chatId, { updatedAt: new Date() }).exec();
+        // Обновляем время чата
+        await Chat.findByIdAndUpdate(chatId, { updatedAt: new Date() });
 
-        // Отправляем сообщение всем участникам
+        // Важно: отправляем ВСЕМ в комнате через io.to
+        // Это гарантирует, что сообщение появится у всех участников мгновенно
         io.to(chatId).emit('newMessage', populatedMsg);
 
       } catch (error) {
@@ -69,18 +83,25 @@ const setupSocketHandlers = (io) => {
     socket.on('disconnect', async () => {
       console.log('🔌 Пользователь отключился:', socket.userId);
       try {
-        await User.findByIdAndUpdate(socket.userId, { 
-          isOnline: false, 
-          lastSeen: new Date() 
-        });
+        // Небольшая задержка перед оффлайном (защита от случайных миганий связи)
+        setTimeout(async () => {
+            // Проверяем, не переподключился ли пользователь под тем же ID
+            const activeSockets = await io.in(socket.userId).fetchSockets();
+            if (activeSockets.length === 0) {
+                await User.findByIdAndUpdate(socket.userId, { 
+                  isOnline: false, 
+                  lastSeen: new Date() 
+                });
 
-        const userChats = await Chat.find({ participants: socket.userId });
-        userChats.forEach(chat => {
-          socket.to(chat._id.toString()).emit('userStatusUpdate', { 
-            userId: socket.userId, 
-            isOnline: false 
-          });
-        });
+                const userChats = await Chat.find({ participants: socket.userId });
+                userChats.forEach(chat => {
+                  io.to(chat._id.toString()).emit('userStatusUpdate', { 
+                    userId: socket.userId, 
+                    isOnline: false 
+                  });
+                });
+            }
+        }, 5000); 
       } catch (error) {
         console.error('Ошибка при отключении:', error);
       }
