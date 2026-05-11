@@ -2,11 +2,19 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  pool: true, // Держать соединение открытым
+  pool: true, // Использовать пул соединений
+  maxConnections: 5,
+  maxMessages: 100,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+});
+
+// Проверка соединения один раз при запуске
+transporter.verify((error) => {
+  if (error) console.log('❌ Ошибка почты:', error);
+  else console.log('📧 Почтовый сервер готов');
 });
 
 const sendVerificationCode = async (email, code) => {
