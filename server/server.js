@@ -69,10 +69,10 @@ app.use((req, res, next) => {
 });
 
 // 1. Сначала API роуты
-app.use(authRoutes);
-app.use(userRoutes);
-app.use(chatRoutes);
-app.use(friendRoutes);
+app.use('/api', authRoutes); 
+app.use('/api', userRoutes);
+app.use('/api', chatRoutes);
+app.use('/api', friendRoutes);
 
 // 2. Затем статика и React Router
 if (process.env.NODE_ENV === 'production') {

@@ -6,8 +6,8 @@ import axios from 'axios';
 const isProduction = window.location.hostname !== 'localhost';
 
 const API = isProduction 
-  ? 'https://gmessanger.onrender.com' // Можно указать явно для надежности
-  : 'http://localhost:5000';
+  ? 'https://gmessanger.onrender.com/api' // Можно указать явно для надежности
+  : 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API,
