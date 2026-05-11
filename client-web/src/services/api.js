@@ -1,7 +1,12 @@
 import axios from 'axios';
 
-const API = process.env.NODE_ENV === 'production' 
-  ? '' 
+// Если в браузере адрес содержит 'render.com', значит мы на сервере.
+// В этом случае используем пустую строку (относительный путь), 
+// иначе — наш локальный хост.
+const isProduction = window.location.hostname !== 'localhost';
+
+const API = isProduction 
+  ? 'https://gmessanger.onrender.com' // Можно указать явно для надежности
   : 'http://localhost:5000';
 
 const api = axios.create({
