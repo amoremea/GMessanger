@@ -37,4 +37,7 @@ const sendVerificationCode = async (email, code) => {
   }
 };
 
-module.exports = { sendVerificationCode };
+module.exports = { 
+  sendVerificationCode, 
+  sendResendCode: sendVerificationCode // Обязательно дай это имя!
+};
