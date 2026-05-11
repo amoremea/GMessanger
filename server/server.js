@@ -65,11 +65,8 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(buildPath));
 
   // Используем функцию вместо строки/регулярки для максимальной совместимости
-  app.get('*', (req, res, next) => {
-    // Если запрос на API или файл, пропускаем
-    if (req.url.startsWith('/api') || req.url.includes('.')) {
-      return next();
-    }
+  app.get(/^(?!\/api).+/, (req, res) => {
+    const buildPath = path.resolve(__dirname, '../client-web/build');
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }
