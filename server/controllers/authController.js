@@ -12,12 +12,11 @@ const register = async (req, res) => {
   try {
     const { username, email, password, confirmPassword } = req.body;
 
-    // Валидация Email
     if (!email || !isValidEmail(email)) {
       return res.status(400).json({ error: 'Введите корректный адрес электронной почты' });
     }
 
-    if (!username || !email || !password) {
+    if (!username || !password) {
       return res.status(400).json({ error: 'Заполните все поля' });
     }
 
@@ -26,10 +25,25 @@ const register = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const newUser = new User({ username, email, passwordHash: hash });
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const newUser = new User({ 
+      username, 
+      email, 
+      passwordHash: hash,
+      verificationCode: code,
+      isVerified: false 
+    });
+
     await newUser.save();
 
-    res.json({ message: 'Регистрация успешна! Теперь войдите в аккаунт.' });
+    // ОТПРАВКА БЕЗ AWAIT (Фоновый режим)
+    sendVerificationCode(email, code);
+
+    res.json({ 
+      message: 'Регистрация успешна! Код подтверждения отправлен на почту.',
+      requiresVerification: true 
+    });
   } catch (err) {
     if (err.code === 11000) {
       return res.status(400).json({ error: 'Пользователь с такими данными уже существует' });
@@ -79,7 +93,9 @@ const login = async (req, res) => {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       user.verificationCode = code;
       await user.save();
-      await sendVerificationCode(email, code);
+
+      // ОТПРАВКА БЕЗ AWAIT
+      sendVerificationCode(email, code);
 
       return res.status(403).json({
         error: 'Email не подтвержден',
@@ -90,7 +106,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '7d' }
     );
     res.json({ token });
   } catch (err) {
@@ -113,7 +129,9 @@ const resendCode = async (req, res) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     user.verificationCode = code;
     await user.save();
-    await sendResendCode(email, code);
+
+    // ОТПРАВКА БЕЗ AWAIT
+    sendResendCode(email, code);
 
     res.json({ message: 'Код успешно отправлен повторно' });
   } catch (err) {

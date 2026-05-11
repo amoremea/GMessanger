@@ -6,7 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const dns = require('node:dns');
 
-// 1. Фикс для стабильных запросов к API
 dns.setDefaultResultOrder('ipv4first');
 
 const connectDB = require('./config/db');
@@ -22,7 +21,6 @@ const app = express();
 const server = http.createServer(app);
 const io = initSocket(server);
 
-// Создаем папку uploads
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
@@ -32,7 +30,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// 2. Настройка CORS (разрешаем Render, Localhost и Electron)
 const allowedOrigins = [
   'http://localhost:3000',
   'https://gmessanger.onrender.com',
@@ -53,30 +50,31 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Подключаем БД
 connectDB();
 setupSocketHandlers(io);
 
-// 3. Роуты API (БЕЗ ПРЕФИКСА /api, чтобы не ломать фронтенд)
+// 1. Сначала API роуты
 app.use(authRoutes);
 app.use(userRoutes);
 app.use(chatRoutes);
 app.use(friendRoutes);
 
-// 4. Настройка фронтенда для Production
+// 2. Затем статика и React Router
 if (process.env.NODE_ENV === 'production') {
   const buildPath = path.resolve(__dirname, '../client-web/build');
-  console.log('🌐 Serving static files from:', buildPath);
-  
   app.use(express.static(buildPath));
 
-  // Этот обработчик должен быть САМЫМ ПОСЛЕДНИМ
-  app.get(/^(?!\/api).+/, (req, res) => {
+  // Используем функцию вместо строки/регулярки для максимальной совместимости
+  app.get('*', (req, res, next) => {
+    // Если запрос на API или файл, пропускаем
+    if (req.url.startsWith('/api') || req.url.includes('.')) {
+      return next();
+    }
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

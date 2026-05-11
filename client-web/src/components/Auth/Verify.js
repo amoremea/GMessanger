@@ -37,6 +37,8 @@ export const Verify = ({ onBackToLogin }) => {
       <div className="auth-image-verify"></div>
       <h4 className="auth-title">{email}</h4>
       <p className="auth-subtitle">Мы отправили код подтверждения на вашу почту. Введите его ниже.</p>
+      <div className="text-danger"> ВНИМАНИЕ! </div>
+      <div className="text-danger"> КОД ПРИХОДИТ В ТЕЧЕНИЕ 5 МИНУТ </div>
       <input
         className="tg-input code-input"
         placeholder="Код"
@@ -46,7 +48,6 @@ export const Verify = ({ onBackToLogin }) => {
       />
       {error && <div className="text-danger small mb-2">{error}</div>}
       <button className="tg-btn-primary" onClick={handleVerify}>ПОДТВЕРДИТЬ</button>
-
       <div className="mt-3">
         <button
           className="tg-btn-link d-block w-100"
