@@ -1,12 +1,20 @@
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
-}
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const fs = require('fs');
-const path = require('path');
 const dns = require('node:dns');
+
+// ВАЖНО: Убери старый require('dotenv').config() или вызовы dotenvx
+const path = require('path');
+
+// Используем стандартный dotenv только если мы НЕ на продакшене
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config({ path: path.resolve(__dirname, './.env') });
+}
+
+// Теперь переменные ТОЧНО будут доступны
+console.log('--- DEBUG ENV ---');
+console.log('EMAIL_USER:', process.env.EMAIL_USER);
 
 dns.setDefaultResultOrder('ipv4first');
 
