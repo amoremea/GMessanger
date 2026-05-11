@@ -1,14 +1,17 @@
 const nodemailer = require('nodemailer');
 
+console.log('Проверка переменных:', {
+  user: process.env.EMAIL_USER ? 'OK' : 'MISSING',
+  pass: process.env.EMAIL_PASS ? 'OK' : 'MISSING'
+});
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   pool: true, // Использовать пул соединений
-  maxConnections: 5,
-  maxMessages: 100,
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
+    pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : ''
+  }
 });
 
 // Проверка соединения один раз при запуске
