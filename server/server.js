@@ -4,6 +4,10 @@ const cors = require('cors');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const dns = require('node:dns');
+
+// 1. Фикс для стабильных запросов к API (Resend/MongoDB)
+dns.setDefaultResultOrder('ipv4first');
 
 const connectDB = require('./config/db');
 const initSocket = require('./config/socket');
@@ -45,27 +49,19 @@ app.use('/', userRoutes);
 app.use('/', chatRoutes);
 app.use('/', friendRoutes);
 
-// Настройка фронтенда для Production
-const buildPath = path.resolve(__dirname, '../client-web/build');
-
+// --- Настройка фронтенда для Production ---
 if (process.env.NODE_ENV === 'production') {
+  const buildPath = path.resolve(__dirname, '../client-web/build');
   console.log('🌐 Serving static files from:', buildPath);
   
-  // 1. Раздаем статические файлы
   app.use(express.static(buildPath));
 
-  // 2. Вместо app.get со звездочкой используем middleware.
-  // Если запрос дошел сюда и это не API (проверяем по отсутствию расширения или пути),
-  // отдаем index.html.
-  app.use((req, res, next) => {
-    // Если это GET запрос и он не похож на файл (нет точки в конце пути, как .js или .css)
-    if (req.method === 'GET' && !req.url.includes('.')) {
-      res.sendFile(path.join(buildPath, 'index.html'));
-    } else {
-      next();
-    }
+  app.get('*', (req, res) => {
+    // Если это не API запрос (можно добавить проверку !req.url.startsWith('/api'))
+    res.sendFile(path.join(buildPath, 'index.html'));
   });
 }
+
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);

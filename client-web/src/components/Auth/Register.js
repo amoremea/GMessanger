@@ -9,9 +9,19 @@ export const Register = ({ onSwitchToLogin }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
 
+  const validateEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Новая проверка почты
+    if (!validateEmail(email)) {
+      setError('Введите корректный адрес Email');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Пароли не совпадают');

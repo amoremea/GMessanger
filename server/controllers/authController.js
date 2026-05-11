@@ -3,9 +3,19 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { sendVerificationCode, sendResendCode } = require('../services/emailService');
 
+// Вспомогательная функция для валидации формата Email
+const isValidEmail = (email) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).toLowerCase());
+};
+
 const register = async (req, res) => {
   try {
     const { username, email, password, confirmPassword } = req.body;
+
+    // Валидация Email
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Введите корректный адрес электронной почты' });
+    }
 
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'Заполните все поля' });
@@ -30,23 +40,36 @@ const register = async (req, res) => {
 };
 
 const verify = async (req, res) => {
-  const { email, code } = req.body;
-  const user = await User.findOne({ email, verificationCode: code });
+  try {
+    const { email, code } = req.body;
+    
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Некорректный Email' });
+    }
 
-  if (!user) return res.status(400).json({ error: 'Неверный код' });
+    const user = await User.findOne({ email, verificationCode: code });
 
-  user.isVerified = true;
-  user.verificationCode = undefined;
-  await user.save();
+    if (!user) return res.status(400).json({ error: 'Неверный код' });
 
-  res.json({ success: true });
+    user.isVerified = true;
+    user.verificationCode = undefined;
+    await user.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка при верификации' });
+  }
 };
 
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
 
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Некорректный формат Email' });
+    }
+
+    const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
@@ -78,8 +101,12 @@ const login = async (req, res) => {
 const resendCode = async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
 
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Некорректный формат Email' });
+    }
+
+    const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
     if (user.isVerified) return res.status(400).json({ error: 'Почта уже подтверждена' });
 

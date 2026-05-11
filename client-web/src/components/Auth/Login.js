@@ -6,15 +6,26 @@ export const Login = ({ onSwitchToRegister }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  const validateEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Новая проверка
+    if (!validateEmail(email)) {
+      setError('Введите корректный адрес Email');
+      return;
+    }
+
     const result = await login({ email, password });
     if (!result.success && !result.requiresVerification) {
       setError(result.error);
     }
   };
-
+  
   return (
     <>
       <h4 className="auth-title">Вход в GigaMessage</h4>
