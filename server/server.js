@@ -71,12 +71,7 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(buildPath));
 
   // Этот обработчик должен быть САМЫМ ПОСЛЕДНИМ
-  app.get('*', (req, res) => {
-    // Если запрос пришел на файл (картинку, скрипт), которого нет — отдаем 404
-    if (req.path.includes('.')) {
-      return res.status(404).send('Not found');
-    }
-    // Для всех остальных путей отдаем index.html (поддержка React Router)
+  app.get('(.*)', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }
