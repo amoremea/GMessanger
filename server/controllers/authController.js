@@ -1,0 +1,135 @@
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const { sendVerificationCode, sendResendCode } = require('../services/emailService');
+
+const register = async (req, res) => {
+  try {
+    const { username, email, password, confirmPassword } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Заполните все поля' });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: 'Пароли не совпадают' });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const newUser = new User({ username, email, passwordHash: hash });
+    await newUser.save();
+
+    res.json({ message: 'Регистрация успешна! Теперь войдите в аккаунт.' });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ error: 'Пользователь с такими данными уже существует' });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Ошибка сервера при регистрации' });
+  }
+};
+
+const verify = async (req, res) => {
+  const { email, code } = req.body;
+  const user = await User.findOne({ email, verificationCode: code });
+
+  if (!user) return res.status(400).json({ error: 'Неверный код' });
+
+  user.isVerified = true;
+  user.verificationCode = undefined;
+  await user.save();
+
+  res.json({ success: true });
+};
+
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) return res.status(400).json({ error: 'Неверный пароль' });
+
+    if (!user.isVerified) {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      user.verificationCode = code;
+      await user.save();
+      await sendVerificationCode(email, code);
+
+      return res.status(403).json({
+        error: 'Email не подтвержден',
+        requiresVerification: true
+      });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const resendCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
+    if (user.isVerified) return res.status(400).json({ error: 'Почта уже подтверждена' });
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verificationCode = code;
+    await user.save();
+    await sendResendCode(email, code);
+
+    res.json({ message: 'Код успешно отправлен повторно' });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка при отправке почты' });
+  }
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const { bio, location, displayName } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { bio, location, displayName },
+      { new: true }
+    ).select('-passwordHash');
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка обновления профиля' });
+  }
+};
+
+const updateAvatar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Файл не выбран' });
+
+    const avatarUrl = `/uploads/${req.file.filename}`;
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { avatarUrl },
+      { new: true }
+    ).select('-passwordHash');
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка при обновлении аватара' });
+  }
+};
+
+module.exports = {
+  register,
+  verify,
+  login,
+  resendCode,
+  updateProfile,
+  updateAvatar
+};

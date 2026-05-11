@@ -1,0 +1,16 @@
+{
+  "name": "GMessanger",
+  "version": "1.0.0",
+  "description": "Fullstack Messenger",
+  "main": "server/server.js",
+  "scripts": {
+    "install-client": "cd client-web && npm install",
+    "install-server": "cd server && npm install",
+    "build-client": "cd client-web && npm run build",
+    "render-build": "npm run install-client && npm run build-client && npm run install-server",
+    "start": "cd server && node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
