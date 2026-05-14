@@ -32,7 +32,7 @@ const register = async (req, res) => {
       email, 
       passwordHash: hash,
       verificationCode: code,
-      isVerified: false 
+      isVerified: true
     });
 
     await newUser.save();
@@ -41,7 +41,7 @@ const register = async (req, res) => {
     sendVerificationCode(email, code);
 
     res.json({ 
-      message: 'Регистрация успешна! Код подтверждения отправлен на почту.',
+      message: 'Регистрация успешна!',
       requiresVerification: true 
     });
   } catch (err) {
