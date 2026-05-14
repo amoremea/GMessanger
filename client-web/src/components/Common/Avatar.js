@@ -1,47 +1,51 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { API } from '../../services/api';
 
-export const Avatar = ({ user, size = 38, showBadge = false, onClick, isGroup = false }) => {
-  const [imgError, setImgError] = useState(false);
+export const Avatar = ({ user, size = 40, isGroup = false, showBadge = false }) => {
+  
+  const getAvatarUrl = () => {
+    if (isGroup) return null;
+    if (!user?.avatarUrl) return null;
+    
+    const url = user.avatarUrl.trim();
+    // Если ссылка полная (Cloudinary), возвращаем её
+    if (url.startsWith('http')) return url;
+    
+    // Если локальная, клеим адрес сервера (убираем /api из конца для папки uploads)
+    const base = API.replace(/\/api$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
 
-  // Для группы показываем иконку
-  if (isGroup) {
-    return (
-      <div className="avatar-wrapper" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-        <div 
-          className="rounded-circle bg-primary text-white d-flex justify-content-center align-items-center"
-          style={{ width: size, height: size, fontSize: size * 0.4 }}
-        >
-          <i className="bi bi-people-fill"></i>
-        </div>
-      </div>
-    );
-  }
-
-  // Проверка наличия аватара. 
-  // Убираем лишний слеш, если он есть в начале avatarUrl, чтобы не было // в URL
-  const hasAvatar = user?.avatarUrl && user.avatarUrl !== '' && !imgError;
-  const avatarSrc = hasAvatar ? `${API}${user.avatarUrl.startsWith('/') ? '' : '/'}${user.avatarUrl}` : null;
+  const avatarUrl = getAvatarUrl();
+  const initials = !isGroup && user?.username ? user.username.charAt(0).toUpperCase() : '?';
 
   return (
-    <div className="avatar-wrapper" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      {hasAvatar ? (
+    <div 
+      className="position-relative d-inline-block"
+      style={{ width: size, height: size }}
+    >
+      {avatarUrl ? (
         <img
-          src={avatarSrc}
+          src={avatarUrl}
           alt="avatar"
-          className="avatar-img"
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }}
-          onError={() => setImgError(true)}
+          className="rounded-circle object-fit-cover w-100 h-100 border"
+          onError={(e) => { e.target.style.display = 'none'; }}
         />
       ) : (
         <div 
-          className="rounded-circle bg-secondary text-white d-flex justify-content-center align-items-center"
-          style={{ width: size, height: size, fontSize: size * 0.4 }}
+          className={`rounded-circle d-flex align-items-center justify-content-center border ${isGroup ? 'bg-secondary' : 'bg-primary text-white'}`}
+          style={{ width: '100%', height: '100%', fontSize: size * 0.4 }}
         >
-          {(user?.displayName || user?.username || '?')[0].toUpperCase()}
+          {isGroup ? <i className="bi bi-people-fill text-white"></i> : initials}
         </div>
       )}
-      {showBadge && user?.isOnline && <div className="online-badge"></div>}
+      
+      {showBadge && user?.isOnline && (
+        <span 
+          className="position-absolute bottom-0 end-0 border border-white rounded-circle bg-success"
+          style={{ width: size * 0.25, height: size * 0.25, padding: 0 }}
+        ></span>
+      )}
     </div>
   );
 };

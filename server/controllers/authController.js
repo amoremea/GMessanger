@@ -153,20 +153,23 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// Пример логики для обновления аватара в UserController/AuthController
 const updateAvatar = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'Файл не выбран' });
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
 
-    const avatarUrl = `/uploads/${req.file.filename}`;
+    // В Cloudinary полная ссылка лежит в req.file.path
+    const avatarUrl = req.file.path; 
+
     const user = await User.findByIdAndUpdate(
       req.userId,
-      { avatarUrl },
+      { avatarUrl: avatarUrl }, // Сохраняем в базу https://...
       { new: true }
-    ).select('-passwordHash');
+    );
 
     res.json(user);
   } catch (err) {
-    res.status(500).json({ error: 'Ошибка при обновлении аватара' });
+    res.status(500).json({ error: err.message });
   }
 };
 

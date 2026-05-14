@@ -29,14 +29,20 @@ const deleteMessage = async (req, res) => {
   }
 };
 
+// В файле controllers/messageController.js
 const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'Файл не выбран' });
+      return res.status(400).json({ error: 'Файл не загружен или формат не поддерживается' });
     }
-    res.json({ fileUrl: `/uploads/${req.file.filename}` });
+
+    // Возвращаем фронтенду прямую ссылку на Cloudinary
+    res.json({ 
+      fileUrl: req.file.path, // Прямая ссылка типа https://res.cloudinary.com/...
+      fileName: req.file.originalname 
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Ошибка при загрузке файла' });
+    res.status(500).json({ error: err.message });
   }
 };
 
