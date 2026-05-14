@@ -1,22 +1,29 @@
 import axios from 'axios';
 
-// Если в браузере адрес содержит 'render.com', значит мы на сервере.
-// В этом случае используем пустую строку (относительный путь), 
-// иначе — наш локальный хост.
+// Определяем окружение
 const isProduction = window.location.hostname !== 'localhost';
 
-const API = isProduction 
-  ? 'https://gmessanger.onrender.com/api' // Можно указать явно для надежности
+// Базовый URL для запросов
+export const API_URL = isProduction 
+  ? 'https://gmessanger.onrender.com/api' 
   : 'http://localhost:5000/api';
 
+// Псевдоним для старых компонентов (Avatar.js и др.)
+export const API = API_URL;
+
+// URL для сокетов (без /api)
+export const SOCKET_URL = isProduction 
+  ? 'https://gmessanger.onrender.com' 
+  : 'http://localhost:5000';
+
 const api = axios.create({
-  baseURL: API,
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Интерсептор для добавления токена
+// Добавление токена в заголовки
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -28,7 +35,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Интерсептор для обработки ошибок авторизации
+// Обработка ошибок авторизации
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -41,4 +48,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-export { API };

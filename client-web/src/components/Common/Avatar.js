@@ -18,14 +18,16 @@ export const Avatar = ({ user, size = 38, showBadge = false, onClick, isGroup = 
     );
   }
 
-  // Для пользователя - проверяем есть ли аватар и нет ли ошибки загрузки
+  // Проверка наличия аватара. 
+  // Убираем лишний слеш, если он есть в начале avatarUrl, чтобы не было // в URL
   const hasAvatar = user?.avatarUrl && user.avatarUrl !== '' && !imgError;
-  
+  const avatarSrc = hasAvatar ? `${API}${user.avatarUrl.startsWith('/') ? '' : '/'}${user.avatarUrl}` : null;
+
   return (
     <div className="avatar-wrapper" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       {hasAvatar ? (
         <img
-          src={`${API}${user.avatarUrl}`}
+          src={avatarSrc}
           alt="avatar"
           className="avatar-img"
           style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }}

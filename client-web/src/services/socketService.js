@@ -1,5 +1,5 @@
 import io from 'socket.io-client';
-import { API } from './api';
+import { SOCKET_URL } from './api';
 
 class SocketService {
   constructor() {
@@ -9,17 +9,22 @@ class SocketService {
   }
 
   connect(token) {
+    // Если сокет уже подключен, не создаем новое соединение
     if (this.socket && this.socket.connected) {
       return this.socket;
     }
 
-    // Используем API или undefined для автоматического определения хоста
-    this.socket = io(API || undefined, {
+    // Инициализация соединения
+    // Используем SOCKET_URL (без /api), который мы настроили в api.js
+    this.socket = io(SOCKET_URL, {
       auth: { token },
-      reconnectionAttempts: 10, // Увеличили кол-во попыток для стабильности на Render
-      reconnectionDelay: 2000,   // Чуть больше задержка между попытками
-      transports: ['websocket', 'polling'], // Включаем оба транспорта
-      timeout: 20000,            // Таймаут соединения
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+      // transports: ['websocket'] — это "золотой стандарт" для Render.
+      // Позволяет избежать ошибок 400 Bad Request.
+      transports: ['websocket'],
+      upgrade: false,
+      timeout: 20000,
       autoConnect: true,
     });
 
@@ -32,38 +37,52 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
       this.currentChat = null;
+      console.log('🔌 Socket disconnected manually');
     }
   }
 
   setupListeners() {
     if (!this.socket) return;
-    
+
+    this.socket.on('connect', () => {
+      console.log('🚀 Socket connected:', this.socket.id);
+    });
+
     this.socket.on('connect_error', (err) => {
-      console.error('Socket connect error:', err.message);
+      console.error('❌ Socket connect error:', err.message);
+      
+      // Если сервер говорит, что токен невалидный — сигнализируем приложению
       if (err.message === 'Unauthorized' || err.message === 'invalid token') {
         localStorage.removeItem('token');
         window.dispatchEvent(new Event('authError'));
       }
     });
 
-    // Автоматическое переподключение к текущему чату при разрыве связи
+    // Автоматическое переподключение к комнате чата при разрыве связи
     this.socket.on('reconnect', () => {
       if (this.currentChat) {
-        console.log(`🔄 Переподключение к чату: ${this.currentChat}`);
+        console.log(`🔄 Re-joining chat room: ${this.currentChat}`);
         this.emit('joinChat', this.currentChat);
       }
     });
+
+    this.socket.on('disconnect', (reason) => {
+      console.warn('⚠️ Socket disconnected. Reason:', reason);
+    });
   }
 
+  // Подписка на события
   on(event, callback) {
     if (!this.socket) return;
     this.socket.on(event, callback);
+    
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
     this.listeners.get(event).push(callback);
   }
 
+  // Отписка от событий
   off(event, callback) {
     if (!this.socket) return;
     if (callback) {
@@ -77,14 +96,16 @@ class SocketService {
     }
   }
 
+  // Отправка данных на сервер
   emit(event, data) {
     if (this.socket && this.socket.connected) {
       this.socket.emit(event, data);
     } else {
-      console.warn(`Socket not connected, cannot emit ${event}`);
+      console.warn(`📡 Socket not connected, cannot emit: ${event}`);
     }
   }
 
+  // Вход в комнату чата
   joinChat(chatId) {
     if (this.currentChat && this.currentChat !== chatId) {
       this.emit('leaveChat', this.currentChat);
@@ -94,11 +115,12 @@ class SocketService {
     this.emit('joinChat', chatId);
   }
 
-  sendMessage(data) {
-    this.emit('sendMessage', data);
+  // Отправка сообщения (теперь используется для уведомления в реальном времени)
+  sendMessage(messageData) {
+    this.emit('sendMessage', messageData);
   }
 }
 
-// Исправляем eslint warning: сначала создаем экземпляр, потом экспортируем
+// Создаем единственный экземпляр сервиса (Singleton)
 const socketServiceInstance = new SocketService();
 export default socketServiceInstance;
