@@ -1,10 +1,11 @@
-// components/MainApp.js - проверьте эту часть
+// components/MainApp.js - ИСПРАВЛЕННАЯ МОБИЛЬНАЯ ВЕРСИЯ
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar/Sidebar';
 import { ChatMain } from './Chat/ChatMain';
 import { ProfileModal } from './Modals/ProfileModal';
 import { GroupModal } from './Modals/GroupModal';
 import { GroupInfoModal } from './Modals/GroupInfoModal';
+import { MobileNav } from './Layout/MobileNav';
 import { useChat } from '../hooks/useChat';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
@@ -62,131 +63,144 @@ export const MainApp = () => {
     }
   };
 
-  // Функции для открытия модальных окон
   const handleOpenProfile = (userData) => {
-    console.log('🟢 Opening profile modal with user:', userData);
     setProfileUser(userData);
     setIsProfileModalOpen(true);
     if (isMobile) setIsMobileMenuOpen(false);
   };
 
-  const handleCloseProfileModal = () => {
-    console.log('🔴 Closing profile modal');
-    setIsProfileModalOpen(false);
-    setProfileUser(null);
+  // Открыть меню
+  const handleOpenMenu = () => {
+    setIsMobileMenuOpen(true);
   };
 
-  const handleOpenGroupModal = () => {
-    console.log('🟢 Opening group modal');
-    setIsGroupModalOpen(true);
+  // Закрыть чат и вернуться к списку
+  const handleCloseChat = () => {
+    if (currentChat) {
+      // Просто показываем плейсхолдер без чата
+      // Для этого нужно будет доработать, но пока просто открываем меню
+      setIsMobileMenuOpen(true);
+    }
   };
-
-  const handleCloseGroupModal = () => {
-    console.log('🔴 Closing group modal');
-    setIsGroupModalOpen(false);
-  };
-
-  const handleOpenGroupInfo = () => {
-    console.log('🟢 Opening group info modal');
-    setIsGroupInfoOpen(true);
-  };
-
-  const handleCloseGroupInfo = () => {
-    console.log('🔴 Closing group info modal');
-    setIsGroupInfoOpen(false);
-  };
-
-  console.log('🔵 Modal states:', { isProfileModalOpen, isGroupModalOpen, isGroupInfoOpen, profileUser });
 
   return (
     <div className={`chat-container ${theme}`}>
-      {/* Мобильная кнопка */}
+      {/* ===== МОБИЛЬНАЯ ВЕРСИЯ ===== */}
       {isMobile && (
-        <button 
-          className="mobile-menu-btn"
-          onClick={() => setIsMobileMenuOpen(true)}
-          style={{ display: isMobileMenuOpen ? 'none' : 'flex' }}
-        >
-          <i className="bi bi-list"></i>
-        </button>
+        <>
+          {/* Мобильная кнопка открытия меню - всегда показываем если нет активного чата */}
+          {!currentChat && (
+            <button 
+              className="mobile-menu-btn"
+              onClick={handleOpenMenu}
+            >
+              <i className="bi bi-list"></i>
+            </button>
+          )}
+          
+          {/* Мобильное меню (сайдбар) */}
+          <MobileNav isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)}>
+            <Sidebar
+              chats={chats}
+              currentChat={currentChat}
+              openChat={handleOpenChat}
+              createChat={createChat}
+              onOpenGroupModal={() => setIsGroupModalOpen(true)}
+              onOpenProfile={handleOpenProfile}
+              onMobileClose={() => setIsMobileMenuOpen(false)}
+            />
+          </MobileNav>
+
+          {/* Основная область чата */}
+          <div className="chat-main">
+            <ChatMain
+              currentChat={currentChat}
+              messages={messages}
+              chats={chats}
+              onSendMessage={sendMessage}
+              onOpenProfile={handleOpenProfile}
+              onOpenGroupInfo={() => setIsGroupInfoOpen(true)}
+              isMobile={true}
+              onBack={handleCloseChat}
+              onMenuOpen={handleOpenMenu}
+            />
+          </div>
+        </>
       )}
 
-      {/* Оверлей для мобильного меню */}
-      {isMobile && isMobileMenuOpen && (
-        <div className="sidebar-overlay" onClick={() => setIsMobileMenuOpen(false)} />
+      {/* ===== ДЕСКТОПНАЯ ВЕРСИЯ ===== */}
+      {!isMobile && (
+        <>
+          {/* Десктопный сайдбар */}
+          <div className="sidebar" style={{ width: `${sidebarWidth}px` }}>
+            <Sidebar
+              chats={chats}
+              currentChat={currentChat}
+              openChat={handleOpenChat}
+              createChat={createChat}
+              onOpenGroupModal={() => setIsGroupModalOpen(true)}
+              onOpenProfile={handleOpenProfile}
+              width={sidebarWidth}
+              onWidthChange={setSidebarWidth}
+            />
+            <div className="sidebar-resizer" onMouseDown={(e) => {
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              
+              const onMouseMove = (moveEvent) => {
+                const newWidth = startWidth + (moveEvent.clientX - startX);
+                if (newWidth >= 260 && newWidth <= 500) {
+                  setSidebarWidth(newWidth);
+                }
+              };
+              
+              const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                document.body.style.cursor = '';
+              };
+              
+              document.body.style.cursor = 'col-resize';
+              document.addEventListener('mousemove', onMouseMove);
+              document.addEventListener('mouseup', onMouseUp);
+            }} />
+          </div>
+
+          {/* Основная область чата */}
+          <div className="chat-main">
+            <ChatMain
+              currentChat={currentChat}
+              messages={messages}
+              chats={chats}
+              onSendMessage={sendMessage}
+              onOpenProfile={handleOpenProfile}
+              onOpenGroupInfo={() => setIsGroupInfoOpen(true)}
+              isMobile={false}
+            />
+          </div>
+        </>
       )}
 
-      {/* Сайдбар */}
-      <div 
-        className={`sidebar ${isMobile && isMobileMenuOpen ? 'open' : ''}`}
-        style={{ width: isMobile ? '85%' : `${sidebarWidth}px` }}
-      >
-        <Sidebar
-          chats={chats}
-          currentChat={currentChat}
-          openChat={handleOpenChat}
-          createChat={createChat}
-          onOpenGroupModal={handleOpenGroupModal}
-          onOpenProfile={handleOpenProfile}
-          onMobileClose={() => setIsMobileMenuOpen(false)}
-          width={isMobile ? undefined : sidebarWidth}
-          onWidthChange={setSidebarWidth}
-        />
-        <div className="sidebar-resizer" onMouseDown={(e) => {
-          if (isMobile) return;
-          const startX = e.clientX;
-          const startWidth = sidebarWidth;
-          
-          const onMouseMove = (moveEvent) => {
-            const newWidth = startWidth + (moveEvent.clientX - startX);
-            if (newWidth >= 260 && newWidth <= 500) {
-              setSidebarWidth(newWidth);
-            }
-          };
-          
-          const onMouseUp = () => {
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-            document.body.style.cursor = '';
-          };
-          
-          document.body.style.cursor = 'col-resize';
-          document.addEventListener('mousemove', onMouseMove);
-          document.addEventListener('mouseup', onMouseUp);
-        }} />
-      </div>
-
-      {/* Основная область чата */}
-      <div className="chat-main">
-        <ChatMain
-          currentChat={currentChat}
-          messages={messages}
-          chats={chats}
-          onSendMessage={sendMessage}
-          onOpenProfile={handleOpenProfile}
-          onOpenGroupInfo={handleOpenGroupInfo}
-          isMobile={isMobile}
-          onBack={() => setIsMobileMenuOpen(true)}
-        />
-      </div>
-
-      {/* МОДАЛЬНЫЕ ОКНА - должны быть за пределами всего */}
+      {/* Модальные окна */}
       {isProfileModalOpen && profileUser && (
         <ProfileModal
           user={profileUser}
-          onClose={handleCloseProfileModal}
+          onClose={() => {
+            setIsProfileModalOpen(false);
+            setProfileUser(null);
+          }}
           openChat={openChat}
         />
       )}
 
       {isGroupModalOpen && (
-        <GroupModal onClose={handleCloseGroupModal} />
+        <GroupModal onClose={() => setIsGroupModalOpen(false)} />
       )}
 
       {isGroupInfoOpen && currentChatData && (
         <GroupInfoModal 
           chat={currentChatData} 
-          onClose={handleCloseGroupInfo}
+          onClose={() => setIsGroupInfoOpen(false)}
           onOpenProfile={handleOpenProfile}
           onRefresh={loadChats}
         />

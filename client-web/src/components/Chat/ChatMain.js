@@ -1,4 +1,4 @@
-// components/Chat/ChatMain.js - Адаптивная версия
+// components/Chat/ChatMain.js - Полностью адаптивная версия
 import React, { useRef, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../Common/Avatar';
@@ -19,7 +19,6 @@ export const ChatMain = ({
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
   const [fileName, setFileName] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -75,137 +74,142 @@ export const ChatMain = ({
     return `${API}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
+  // Если чат не выбран
   if (!currentChat) {
     return (
-      <div className="flex-grow-1 d-flex align-items-center justify-content-center bg-chat">
-        <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
-          <i className="bi bi-chat-dots display-1 mb-3 d-block"></i>
+      <div className="chat-placeholder">
+        <div className="chat-placeholder-content">
+          <i className="bi bi-chat-dots"></i>
           <p>Выберите чат, чтобы начать общение</p>
-          {isMobile && (
-            <button 
-              className="btn btn-primary mt-3 rounded-pill"
-              onClick={onBack}
-            >
-              <i className="bi bi-arrow-left me-2"></i>
-              К списку чатов
-            </button>
-          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="chat-main h-100 d-flex flex-column">
-      {/* Десктопный хедер */}
-      {!isMobile && (
-        <div className="chat-header">
-          <div className="d-flex align-items-center" style={{ cursor: 'pointer' }} onClick={handleHeaderClick}>
-            <Avatar user={isGroup ? null : otherUser} size={40} isGroup={isGroup} showBadge={!isGroup} />
-            <div className="ms-3">
-              <h6 className="m-0 fw-bold" style={{ color: 'var(--text-primary)' }}>{chatName}</h6>
-              <small style={{ color: 'var(--text-secondary)' }}>
-                {isGroup 
-                  ? `${currentChatData?.participants?.length || 0} участников` 
-                  : (otherUser?.isOnline ? 'в сети' : 'был(а) недавно')}
-              </small>
-            </div>
+    <div className="chat-main-container">
+      {/* Хедер чата - всегда показываем, на мобильных с кнопкой назад */}
+      <div className="chat-header">
+        {isMobile && (
+          <button className="chat-header-back" onClick={onBack}>
+            <i className="bi bi-arrow-left"></i>
+          </button>
+        )}
+        <div className="chat-header-info" onClick={handleHeaderClick}>
+          <Avatar 
+            user={isGroup ? null : otherUser} 
+            size={isMobile ? 40 : 44} 
+            isGroup={isGroup} 
+            showBadge={!isGroup} 
+          />
+          <div className="chat-header-text">
+            <h6>{chatName}</h6>
+            <small>
+              {isGroup 
+                ? `${currentChatData?.participants?.length || 0} участников` 
+                : (otherUser?.isOnline ? 'в сети' : 'был(а) недавно')}
+            </small>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Область сообщений */}
       <div className="messages-area">
-        {messages.map((msg, index) => {
-          const isMe = msg.sender?._id === user?.userId || msg.sender === user?.userId;
-          const fileUrl = getFileUrl(msg.fileUrl);
-          const isImage = fileUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+        {messages.length === 0 ? (
+          <div className="messages-empty">
+            <i className="bi bi-chat-square-text"></i>
+            <p>Нет сообщений</p>
+            <span>Напишите первое сообщение</span>
+          </div>
+        ) : (
+          messages.map((msg, index) => {
+            const isMe = msg.sender?._id === user?.userId || msg.sender === user?.userId;
+            const fileUrl = getFileUrl(msg.fileUrl);
+            const isImage = fileUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i);
 
-          return (
-            <div key={msg._id || index} className={`d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'}`}>
-              {!isMe && isGroup && (
-                <div 
-                  className="me-2 mt-auto" 
-                  onClick={() => onOpenProfile(msg.sender)} 
-                  style={{ cursor: 'pointer' }}
-                >
-                  <Avatar user={msg.sender} size={28} />
-                </div>
-              )}
-              <div className={`message-bubble ${isMe ? 'message-sent' : 'message-received'}`}>
+            return (
+              <div key={msg._id || index} className={`message-wrapper ${isMe ? 'own' : 'other'}`}>
                 {!isMe && isGroup && (
-                  <div className="fw-bold small mb-1" style={{ color: 'var(--accent)' }}>
-                    {msg.sender?.displayName || msg.sender?.username}
+                  <div className="message-avatar" onClick={() => onOpenProfile(msg.sender)}>
+                    <Avatar user={msg.sender} size={isMobile ? 28 : 32} />
                   </div>
                 )}
-                
-                {msg.fileUrl && (
-                  <div className="mb-2">
-                    {isImage ? (
-                      <img 
-                        src={fileUrl} 
-                        alt="attachment" 
-                        className="img-fluid rounded" 
-                        style={{ maxHeight: '200px', cursor: 'pointer', borderRadius: '12px' }} 
-                        onClick={() => window.open(fileUrl, '_blank')}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <a href={fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
-                        <i className="bi bi-file-earmark-arrow-down me-1"></i> Скачать файл
-                      </a>
-                    )}
+                <div className={`message-bubble ${isMe ? 'message-sent' : 'message-received'}`}>
+                  {!isMe && isGroup && (
+                    <div className="message-sender">
+                      {msg.sender?.displayName || msg.sender?.username}
+                    </div>
+                  )}
+                  
+                  {msg.fileUrl && (
+                    <div className="message-attachment">
+                      {isImage ? (
+                        <img 
+                          src={fileUrl} 
+                          alt="attachment" 
+                          onClick={() => window.open(fileUrl, '_blank')}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <a href={fileUrl} target="_blank" rel="noreferrer">
+                          <i className="bi bi-file-earmark-arrow-down"></i>
+                          Скачать файл
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  
+                  {msg.text && (
+                    <div className="message-text">
+                      {msg.text}
+                    </div>
+                  )}
+                  
+                  <div className="message-time">
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
-                )}
-                
-                {msg.text && (
-                  <div className="message-content" style={{ wordBreak: 'break-word' }}>
-                    {msg.text}
-                  </div>
-                )}
-                
-                <div className="text-end mt-1" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Форма ввода */}
       <form className="message-input-form" onSubmit={handleSend}>
         {file && (
-          <div className="position-absolute bottom-100 mb-2 p-2 bg-primary rounded d-flex gap-2 align-items-center" style={{ left: 16, right: 16 }}>
-            <small className="text-white text-truncate flex-grow-1">
-              <i className="bi bi-paperclip me-1"></i>{fileName}
-            </small>
-            <button type="button" className="btn-close btn-close-white" onClick={() => { setFile(null); setFileName(''); }}></button>
+          <div className="file-preview">
+            <i className="bi bi-paperclip"></i>
+            <span>{fileName}</span>
+            <button type="button" onClick={() => { setFile(null); setFileName(''); }}>
+              <i className="bi bi-x"></i>
+            </button>
           </div>
         )}
         
-        <label className="btn btn-link text-decoration-none p-0" style={{ color: 'var(--accent)' }}>
-          <i className="bi bi-paperclip fs-5"></i>
-          <input type="file" className="d-none" onChange={handleFileChange} />
-        </label>
-        
-        <input
-          ref={inputRef}
-          className="message-input"
-          placeholder="Напишите сообщение..."
-          value={text}
-          onChange={e => setText(e.target.value)}
-        />
-        
-        <button 
-          className="btn btn-link p-0" 
-          style={{ color: 'var(--accent)' }}
-          type="submit" 
-          disabled={!text.trim() && !file}
-        >
-          <i className="bi bi-send-fill fs-5"></i>
-        </button>
+        <div className="message-input-wrapper">
+          <label className="attach-button">
+            <i className="bi bi-paperclip"></i>
+            <input type="file" onChange={handleFileChange} />
+          </label>
+          
+          <input
+            ref={inputRef}
+            className="message-input"
+            placeholder="Напишите сообщение..."
+            value={text}
+            onChange={e => setText(e.target.value)}
+          />
+          
+          <button 
+            className="send-button" 
+            type="submit" 
+            disabled={!text.trim() && !file}
+          >
+            <i className="bi bi-send-fill"></i>
+          </button>
+        </div>
       </form>
     </div>
   );
