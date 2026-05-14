@@ -7,6 +7,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { AuthLayout } from './components/Layout/AuthLayout';
 import { MainApp } from './components/MainApp';
 import { useAuth } from './hooks/useAuth';
+import { useEffect } from 'react';
 import './App.css';
 
 const AppContent = () => {
@@ -20,6 +21,19 @@ const AppContent = () => {
 };
 
 function App() {
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        const height = window.visualViewport.height;
+        document.body.style.height = `${height}px`;
+      }
+    };
+    
+    window.visualViewport?.addEventListener('resize', handleResize);
+    return () => window.visualViewport?.removeEventListener('resize', handleResize);
+  }, []);  
+
   return (
     <ThemeProvider>
       <AuthProvider>

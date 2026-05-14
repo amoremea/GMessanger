@@ -77,19 +77,19 @@ export const ChatMain = ({
 
   // Если чат не выбран
   if (!currentChat) {
-    return (
+      return (
       <div className="chat-placeholder">
-        <div className="chat-placeholder-content">
-          <i className="bi bi-chat-dots"></i>
-          <p>Выберите чат, чтобы начать общение</p>
-          {isMobile && onMenuOpen && (
-            <button className="open-chats-btn" onClick={onMenuOpen}>
-              <i className="bi bi-list"></i>
-              Список чатов
-            </button>
-          )}
-        </div>
+      <div className="chat-placeholder-content">
+        <i className="bi bi-chat-dots"></i>
+        <p>Выберите чат, чтобы начать общение</p>
+        {isMobile && onMenuOpen && (
+          <button className="placeholder-menu-btn" onClick={onMenuOpen}>
+            <i className="bi bi-list"></i>
+            Список чатов
+          </button>
+        )}
       </div>
+    </div>
     );
   }
 

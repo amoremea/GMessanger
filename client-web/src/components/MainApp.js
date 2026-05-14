@@ -1,4 +1,4 @@
-// components/MainApp.js - ИСПРАВЛЕННАЯ МОБИЛЬНАЯ ВЕРСИЯ
+// components/MainApp.js
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar/Sidebar';
 import { ChatMain } from './Chat/ChatMain';
@@ -37,12 +37,10 @@ export const MainApp = () => {
 
   const currentChatData = chats.find(c => c._id === currentChat);
 
-  // Сохраняем ширину сайдбара
   useEffect(() => {
     localStorage.setItem('sidebar-width', sidebarWidth);
   }, [sidebarWidth]);
 
-  // Отслеживаем изменение размера окна
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth <= 768;
@@ -69,18 +67,14 @@ export const MainApp = () => {
     if (isMobile) setIsMobileMenuOpen(false);
   };
 
-  // Открыть меню
+  // Открыть меню (три палочки) - для мобильных
   const handleOpenMenu = () => {
     setIsMobileMenuOpen(true);
   };
 
-  // Закрыть чат и вернуться к списку
+  // Закрыть чат (стрелка назад) - возвращаемся к выбору чата
   const handleCloseChat = () => {
-    if (currentChat) {
-      // Просто показываем плейсхолдер без чата
-      // Для этого нужно будет доработать, но пока просто открываем меню
-      setIsMobileMenuOpen(true);
-    }
+    openChat(null); // Закрываем текущий чат
   };
 
   return (
@@ -88,16 +82,6 @@ export const MainApp = () => {
       {/* ===== МОБИЛЬНАЯ ВЕРСИЯ ===== */}
       {isMobile && (
         <>
-          {/* Мобильная кнопка открытия меню - всегда показываем если нет активного чата */}
-          {!currentChat && (
-            <button 
-              className="mobile-menu-btn"
-              onClick={handleOpenMenu}
-            >
-              <i className="bi bi-list"></i>
-            </button>
-          )}
-          
           {/* Мобильное меню (сайдбар) */}
           <MobileNav isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)}>
             <Sidebar
@@ -122,7 +106,7 @@ export const MainApp = () => {
               onOpenGroupInfo={() => setIsGroupInfoOpen(true)}
               isMobile={true}
               onBack={handleCloseChat}
-              onMenuOpen={handleOpenMenu}  // ДОБАВЬТЕ ЭТУ СТРОКУ
+              onMenuOpen={handleOpenMenu}
             />
           </div>
         </>
@@ -131,7 +115,6 @@ export const MainApp = () => {
       {/* ===== ДЕСКТОПНАЯ ВЕРСИЯ ===== */}
       {!isMobile && (
         <>
-          {/* Десктопный сайдбар */}
           <div className="sidebar" style={{ width: `${sidebarWidth}px` }}>
             <Sidebar
               chats={chats}
@@ -166,7 +149,6 @@ export const MainApp = () => {
             }} />
           </div>
 
-          {/* Основная область чата */}
           <div className="chat-main">
             <ChatMain
               currentChat={currentChat}
