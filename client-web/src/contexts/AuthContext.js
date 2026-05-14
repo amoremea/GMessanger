@@ -1,7 +1,9 @@
+// contexts/AuthContext.js - обновите функции
 import React, { createContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { authService } from '../services/authService';
 import socketService from '../services/socketService';
+import toast from 'react-hot-toast'; // ДОБАВЬТЕ
 
 export const AuthContext = createContext();
 
@@ -17,7 +19,6 @@ export const AuthProvider = ({ children }) => {
       try {
         const decoded = jwtDecode(token);
         setUser(decoded);
-        // Подключаем сокет только если еще не подключен
         if (!socketService.socket || !socketService.socket.connected) {
           console.log('🔌 Подключаем сокет...');
           socketService.connect(token);
@@ -38,13 +39,17 @@ export const AuthProvider = ({ children }) => {
       const newToken = res.data.token;
       localStorage.setItem('token', newToken);
       setToken(newToken);
+      toast.success('Вход выполнен успешно!');
       return { success: true };
     } catch (err) {
       if (err.response?.status === 403 && err.response?.data?.requiresVerification) {
         setStep('verify');
+        toast.info('Требуется подтверждение email');
         return { success: false, requiresVerification: true };
       }
-      return { success: false, error: err.response?.data?.error || 'Ошибка входа' };
+      const errorMsg = err.response?.data?.error || 'Ошибка входа';
+      toast.error(errorMsg);
+      return { success: false, error: errorMsg };
     }
   };
 
@@ -52,12 +57,12 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const res = await authService.register(userData);
-      alert(res.data.message);
+      toast.success(res.data.message || 'Регистрация успешна! Проверьте почту для подтверждения');
       setStep('login');
       return { success: true };
     } catch (err) {
       const errorMsg = err.response?.data?.error || 'Ошибка регистрации';
-      alert(errorMsg);
+      toast.error(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setLoading(false);
@@ -67,11 +72,11 @@ export const AuthProvider = ({ children }) => {
   const verify = async (code) => {
     try {
       await authService.verify({ email, code });
-      alert("Почта подтверждена! Теперь можно войти.");
+      toast.success('Почта подтверждена! Теперь можно войти.');
       setStep('login');
       return { success: true };
     } catch (err) {
-      alert("Неверный код");
+      toast.error('Неверный код подтверждения');
       return { success: false, error: 'Неверный код' };
     }
   };
@@ -79,11 +84,12 @@ export const AuthProvider = ({ children }) => {
   const resendCode = async () => {
     try {
       await authService.resendCode(email);
-      alert("Новый код отправлен на почту");
+      toast.success('Новый код отправлен на почту');
       return { success: true };
     } catch (err) {
-      alert(err.response?.data?.error || "Ошибка отправки");
-      return { success: false, error: err.response?.data?.error };
+      const errorMsg = err.response?.data?.error || 'Ошибка отправки';
+      toast.error(errorMsg);
+      return { success: false, error: errorMsg };
     }
   };
 
@@ -94,15 +100,16 @@ export const AuthProvider = ({ children }) => {
     socketService.disconnect();
     setStep('login');
     setEmail('');
+    toast.success('Вы вышли из аккаунта');
   };
 
   const updateUserProfile = async (profileData) => {
     try {
       const res = await authService.updateProfile(profileData);
-      alert('Профиль обновлен');
+      toast.success('Профиль обновлен');
       return { success: true, data: res.data };
     } catch (err) {
-      alert('Ошибка обновления профиля');
+      toast.error('Ошибка обновления профиля');
       return { success: false };
     }
   };

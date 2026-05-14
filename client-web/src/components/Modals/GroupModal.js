@@ -4,11 +4,13 @@ import { Avatar } from '../Common/Avatar';
 import { useFriends } from '../../hooks/useFriends';
 import { useChat } from '../../hooks/useChat';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../contexts/NotificationContext'; // ДОБАВЬТЕ
 
 export const GroupModal = ({ onClose }) => {
   const { user } = useAuth();
   const { friends } = useFriends();
   const { createChat } = useChat();
+  const { showError, showSuccess } = useNotification(); // ДОБАВЬТЕ
   const [groupName, setGroupName] = useState('');
   const [selectedUsers, setSelectedUsers] = useState([]);
 
@@ -22,17 +24,18 @@ export const GroupModal = ({ onClose }) => {
 
   const handleCreate = async () => {
     if (!groupName.trim() || selectedUsers.length === 0) {
-      alert("Введите название группы и выберите хотя бы одного участника");
+      showError('Введите название группы и выберите хотя бы одного участника');
       return;
     }
 
     const allParticipants = [user?.userId, ...selectedUsers];
     try {
       await createChat(allParticipants, true, groupName);
+      showSuccess('Группа успешно создана!');
       onClose();
     } catch (error) {
       console.error("Ошибка при создании группы:", error);
-      alert("Ошибка при создании группы");
+      showError('Ошибка при создании группы');
     }
   };
 

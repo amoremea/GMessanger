@@ -3,9 +3,11 @@ import React, { useState } from 'react';
 import { Avatar } from '../Common/Avatar';
 import { useFriends } from '../../hooks/useFriends';
 import { chatService } from '../../services/chatService';
+import { useNotification } from '../../contexts/NotificationContext'; // ДОБАВЬТЕ
 
 export const GroupInfoModal = ({ chat, onClose, onOpenProfile, onRefresh }) => {
   const { friends } = useFriends();
+  const { showSuccess, showError } = useNotification(); // ДОБАВЬТЕ
   const [showAddSection, setShowAddSection] = useState(false);
   const [adding, setAdding] = useState(false);
 
@@ -18,10 +20,11 @@ export const GroupInfoModal = ({ chat, onClose, onOpenProfile, onRefresh }) => {
     try {
       await chatService.addParticipant(chat._id, userId);
       if (onRefresh) await onRefresh();
+      showSuccess('Пользователь добавлен в группу');
       setShowAddSection(false);
     } catch (err) {
       console.error("Ошибка:", err);
-      alert(err.response?.data?.error || "Не удалось добавить пользователя");
+      showError(err.response?.data?.error || "Не удалось добавить пользователя");
     } finally {
       setAdding(false);
     }

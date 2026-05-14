@@ -6,9 +6,11 @@ import { useFriends } from '../../hooks/useFriends';
 import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
 import { API_URL } from '../../services/api';
+import { useNotification } from '../../contexts/NotificationContext'; // ДОБАВЬТЕ
 
 export const ProfileModal = ({ user, onClose, openChat }) => {
   const { token, user: currentUser } = useAuth();
+  const { showSuccess, showError } = useNotification(); // ДОБАВЬТЕ
   const { 
     friends, 
     friendRequests, 
@@ -44,6 +46,7 @@ export const ProfileModal = ({ user, onClose, openChat }) => {
       }
     } catch (err) {
       console.error('Ошибка при переходе в чат:', err);
+      showError('Не удалось начать чат');
     }
   };
 
@@ -52,11 +55,12 @@ export const ProfileModal = ({ user, onClose, openChat }) => {
       await axios.put(`${API_URL}/profile`, editedUser, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      alert('Профиль обновлен');
+      showSuccess('Профиль обновлен');
       setIsEditing(false);
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
       console.error('Ошибка обновления профиля:', err);
+      showError('Ошибка обновления профиля');
     }
   };
 
@@ -73,12 +77,20 @@ export const ProfileModal = ({ user, onClose, openChat }) => {
           'Content-Type': 'multipart/form-data'
         }
       });
-      alert('Аватар обновлен!');
-      window.location.reload();
+      showSuccess('Аватар обновлен!');
+      setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
       console.error('Ошибка загрузки аватара:', err);
+      showError('Ошибка загрузки аватара');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleRemoveFriend = () => {
+    if (window.confirm(`Удалить ${user?.username} из друзей?`)) {
+      removeFriend(user._id);
+      onClose();
     }
   };
 
@@ -102,7 +114,6 @@ export const ProfileModal = ({ user, onClose, openChat }) => {
           </div>
           
           {isEditing ? (
-            // Режим редактирования - только для своего профиля
             <div className="profile-edit-form">
               <div className="profile-field">
                 <label>Отображаемое имя</label>
@@ -127,7 +138,6 @@ export const ProfileModal = ({ user, onClose, openChat }) => {
               </div>
             </div>
           ) : (
-            // Режим просмотра
             <>
               <h3 className="profile-name">{user?.displayName || user?.username}</h3>
               <p className="profile-username">@{user?.username}</p>
@@ -138,7 +148,6 @@ export const ProfileModal = ({ user, onClose, openChat }) => {
               </div>
 
               <div className="profile-actions">
-                {/* Кнопка написания сообщения - только для чужих профилей */}
                 {!isMyProfile && (
                   <button className="profile-btn primary" onClick={handleStartChat}>
                     <i className="bi bi-chat-dots"></i>
@@ -146,16 +155,10 @@ export const ProfileModal = ({ user, onClose, openChat }) => {
                   </button>
                 )}
 
-                {/* Кнопки управления дружбой - только для чужих профилей */}
                 {!isMyProfile && (
                   <>
                     {isFriend ? (
-                      <button className="profile-btn danger" onClick={() => {
-                        if (window.confirm(`Удалить ${user?.username} из друзей?`)) {
-                          removeFriend(user._id);
-                          onClose();
-                        }
-                      }}>
+                      <button className="profile-btn danger" onClick={handleRemoveFriend}>
                         <i className="bi bi-person-x"></i>
                         Удалить из друзей
                       </button>
@@ -173,7 +176,6 @@ export const ProfileModal = ({ user, onClose, openChat }) => {
                   </>
                 )}
 
-                {/* Кнопка редактирования - только для своего профиля */}
                 {isMyProfile && (
                   <button className="profile-btn secondary" onClick={() => setIsEditing(true)}>
                     <i className="bi bi-pencil"></i>
