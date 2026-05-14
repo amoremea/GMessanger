@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../contexts/NotificationContext';
 
 export const Login = ({ onSwitchToRegister }) => {
   const { login, setEmail, email } = useAuth();
+  const { showError } = useNotification();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -14,15 +16,16 @@ export const Login = ({ onSwitchToRegister }) => {
     e.preventDefault();
     setError('');
 
-    // Новая проверка
     if (!validateEmail(email)) {
       setError('Введите корректный адрес Email');
+      showError('Некорректный email адрес');
       return;
     }
 
     const result = await login({ email, password });
     if (!result.success && !result.requiresVerification) {
       setError(result.error);
+      showError(result.error);
     }
   };
   

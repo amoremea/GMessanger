@@ -1,3 +1,4 @@
+// controllers/chatController.js - убираем sendMessage отсюда полностью
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 const User = require('../models/User');
@@ -5,10 +6,34 @@ const User = require('../models/User');
 // Получение списка всех чатов пользователя
 exports.getChats = async (req, res) => {
   try {
+    const userId = req.userId.toString();
+    
     const chats = await Chat.find({ participants: req.userId })
       .populate('participants', 'username displayName avatarUrl isOnline bio')
+      .populate('lastMessage.sender', 'username displayName avatarUrl')
       .sort({ updatedAt: -1 });
-    res.json(chats);
+    
+    // Нормализуем unreadCount для каждого чата
+    const normalizedChats = chats.map(chat => {
+      // Преобразуем Map в объект для клиента
+      let unreadCount = {};
+      if (chat.unreadCount && chat.unreadCount instanceof Map) {
+        unreadCount = Object.fromEntries(chat.unreadCount);
+      } else if (chat.unreadCount && typeof chat.unreadCount === 'object') {
+        unreadCount = chat.unreadCount;
+      }
+      
+      // Логируем для отладки
+      const userUnread = unreadCount[userId] || 0;
+      console.log(`  Чат ${chat._id}: unread для ${userId} = ${userUnread}`);
+      
+      return {
+        ...chat.toObject(),
+        unreadCount
+      };
+    });
+    
+    res.json(normalizedChats);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Ошибка при получении чатов' });
@@ -20,13 +45,11 @@ exports.createChat = async (req, res) => {
   try {
     const { participants, isGroup, name } = req.body;
 
-    // Гарантируем, что создатель есть в списке участников
     let allParticipants = participants || [];
     if (!allParticipants.includes(req.userId)) {
       allParticipants.push(req.userId);
     }
 
-    // Если это личный чат (не группа), проверяем, не существует ли он уже
     if (!isGroup && allParticipants.length === 2) {
       const existingChat = await Chat.findOne({
         isGroup: false,
@@ -57,20 +80,11 @@ exports.createChat = async (req, res) => {
   }
 };
 
-// ДОБАВЛЕНИЕ УЧАСТНИКА В ГРУППУ
+// Добавление участника в группу
 exports.addParticipant = async (req, res) => {
   try {
-    const { id } = req.params; 
-    const { userId } = req.body; 
-
-    if (!userId) {
-      return res.status(400).json({ error: 'ID пользователя не указан' });
-    }
-
-    const userToAdd = await User.findById(userId);
-    if (!userToAdd) {
-      return res.status(404).json({ error: 'Пользователь не найден' });
-    }
+    const { id } = req.params;
+    const { userId } = req.body;
 
     const chat = await Chat.findById(id);
     if (!chat) {
@@ -87,9 +101,9 @@ exports.addParticipant = async (req, res) => {
       { new: true }
     ).populate('participants', 'username displayName avatarUrl isOnline bio');
 
-    // Уведомление через сокеты
-    const io = req.app.get('socketio');
+    const io = req.app.get('io');
     if (io) {
+      const userToAdd = await User.findById(userId);
       io.to(id).emit('participantAdded', { chatId: id, newUser: userToAdd });
       io.to(userId.toString()).emit('newChatCreated', updatedChat);
     }
@@ -101,56 +115,36 @@ exports.addParticipant = async (req, res) => {
   }
 };
 
-// ПОЛУЧЕНИЕ СООБЩЕНИЙ
-exports.getMessages = async (req, res) => {
+exports.markAsRead = async (req, res) => {
   try {
-    const { chatId } = req.query;
-    if (!chatId) return res.status(400).json({ error: 'Chat ID обязателен' });
-
-    const messages = await Message.find({ chatId })
-      .populate('sender', 'username displayName avatarUrl')
-      .sort({ createdAt: 1 });
-    res.json(messages);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Ошибка при получении сообщений' });
-  }
-};
-
-exports.sendMessage = async (req, res) => {
-  console.log('=== ПОПЫТКА СОХРАНЕНИЯ ===');
-  console.log('Данные из тела:', req.body);
-  console.log('ID отправителя:', req.userId);
-
-  try {
-    const { chatId, text, fileUrl } = req.body;
-
-    // Проверяем, что ID чата вообще пришел
+    const { chatId } = req.body;
+    const userId = req.userId.toString();
+    
     if (!chatId) {
-       console.log('❌ Ошибка: chatId не пришел с фронтенда!');
-       return res.status(400).json({ error: 'chatId is required' });
+      return res.status(400).json({ error: 'Chat ID required' });
     }
-
-    const newMessage = new Message({
-      chatId: chatId,
-      sender: req.userId,
-      text: text,
-      fileUrl: fileUrl
-    });
-
-    const saved = await newMessage.save();
-    console.log('✅ УСПЕХ! Сообщение в базе:', saved._id);
-
-    // Сокеты
-    const io = req.app.get('socketio');
-    if (io) {
-      io.to(chatId).emit('newMessage', saved);
+    
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
     }
-
-    res.status(201).json(saved);
+    
+    if (!chat.unreadCount) {
+      chat.unreadCount = new Map();
+    }
+    
+    // ⭐ Убеждаемся что устанавливаем 0
+    chat.unreadCount.set(userId, 0);
+    
+    await chat.save();
+    
+    // ⭐ Проверяем что сохранилось
+    const savedChat = await Chat.findById(chatId);
+    console.log(`✅ markAsRead: unreadCount для ${userId} = ${savedChat.unreadCount.get(userId)}`);
+    
+    res.json({ success: true });
   } catch (err) {
-    // ВОТ ТУТ МЫ УВИДИМ ПРАВДУ
-    console.error('❌ ЖЕСТКАЯ ОШИБКА МОНГИ:', err); 
-    res.status(500).json({ error: err.message });
+    console.error('Ошибка markAsRead:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 };

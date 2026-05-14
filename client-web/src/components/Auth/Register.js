@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../contexts/NotificationContext';
+import toast from 'react-hot-toast';
 
 export const Register = ({ onSwitchToLogin }) => {
   const { register, loading } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,20 +20,25 @@ export const Register = ({ onSwitchToLogin }) => {
     e.preventDefault();
     setError('');
 
-    // Новая проверка почты
     if (!validateEmail(email)) {
       setError('Введите корректный адрес Email');
+      showError('Некорректный email адрес');
       return;
     }
 
     if (password !== confirmPassword) {
       setError('Пароли не совпадают');
+      showError('Пароли не совпадают');
       return;
     }
 
     const result = await register({ username, email, password, confirmPassword });
-    if (!result.success) {
+    if (result.success) {
+      showSuccess('Регистрация успешна! Теперь войдите в аккаунт');
+      setTimeout(() => onSwitchToLogin(), 2000);
+    } else {
       setError(result.error);
+      showError(result.error || 'Ошибка регистрации');
     }
   };
 

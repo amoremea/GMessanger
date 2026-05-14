@@ -1,3 +1,4 @@
+// services/friendService.js
 import api from './api';
 
 export const friendService = {
@@ -7,5 +8,5 @@ export const friendService = {
   acceptRequest: (userId) => api.post(`/friends/accept/${userId}`),
   declineRequest: (userId) => api.post(`/friends/decline/${userId}`),
   cancelRequest: (userId) => api.post(`/friends/cancel/${userId}`),
-  removeFriend: (friendId) => api.post('/remove-friend', { friendId }), // ДОБАВЬ ЭТУ СТРОКУ
+  removeFriend: (friendId) => api.post('/remove-friend', { friendId }),
 };

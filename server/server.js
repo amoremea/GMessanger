@@ -1,20 +1,14 @@
+// server.js - исправленная версия
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const fs = require('fs');
 const dns = require('node:dns');
-
-// ВАЖНО: Убери старый require('dotenv').config() или вызовы dotenvx
 const path = require('path');
 
-// Используем стандартный dotenv только если мы НЕ на продакшене
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config({ path: path.resolve(__dirname, './.env') });
 }
-
-// Теперь переменные ТОЧНО будут доступны
-console.log('--- DEBUG ENV ---');
-console.log('EMAIL_USER:', process.env.EMAIL_USER);
 
 dns.setDefaultResultOrder('ipv4first');
 
@@ -29,7 +23,13 @@ const friendRoutes = require('./routes/friendRoutes');
 
 const app = express();
 const server = http.createServer(app);
+
+// ⭐ ВАЖНО: Инициализируем socket ПРАВИЛЬНО
 const io = initSocket(server);
+setupSocketHandlers(io);
+
+// Сохраняем io в app для доступа в контроллерах
+app.set('io', io);
 
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
@@ -48,7 +48,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // В продакшене origin может быть undefined, если запрос идет с того же домена
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -63,27 +62,22 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 connectDB();
-setupSocketHandlers(io);
 
 app.use((req, res, next) => {
   console.log(`📡 [${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
-// 1. Сначала API роуты
 app.use('/api', authRoutes); 
 app.use('/api', userRoutes);
 app.use('/api', chatRoutes);
 app.use('/api', friendRoutes);
 
-// 2. Затем статика и React Router
 if (process.env.NODE_ENV === 'production') {
   const buildPath = path.resolve(__dirname, '../client-web/build');
   app.use(express.static(buildPath));
 
-  // Используем функцию вместо строки/регулярки для максимальной совместимости
   app.get(/^(?!\/api).+/, (req, res) => {
-    const buildPath = path.resolve(__dirname, '../client-web/build');
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }

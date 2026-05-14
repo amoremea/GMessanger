@@ -1,3 +1,4 @@
+// middleware/auth.js
 const jwt = require('jsonwebtoken');
 
 const auth = (req, res, next) => {
@@ -7,14 +8,24 @@ const auth = (req, res, next) => {
       ? authHeader.split(' ')[1]
       : authHeader;
 
-    if (!token) return res.status(401).json({ error: 'No token provided' });
+    if (!token) {
+      console.log('❌ No token provided');
+      return res.status(401).json({ error: 'No token provided' });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    if (!decoded || !decoded.userId) {
+      console.log('❌ Invalid token payload');
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
     req.userId = decoded.userId;
     req.user = decoded;
     next();
   } catch (err) {
-    res.status(401).json({ error: 'Unauthorized' });
+    console.error('❌ Auth error:', err.message);
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 };
 

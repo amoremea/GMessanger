@@ -17,16 +17,18 @@ export const AuthProvider = ({ children }) => {
       try {
         const decoded = jwtDecode(token);
         setUser(decoded);
-        socketService.connect(token);
+        // Подключаем сокет только если еще не подключен
+        if (!socketService.socket || !socketService.socket.connected) {
+          console.log('🔌 Подключаем сокет...');
+          socketService.connect(token);
+        }
       } catch (e) {
         console.error('Ошибка токена:', e);
         logout();
       }
     } else {
       setUser(null);
-      if (socketService.socket) {
-        socketService.disconnect();
-      }
+      socketService.disconnect();
     }
   }, [token]);
 

@@ -1,47 +1,90 @@
+// controllers/friendController.js
 const User = require('../models/User');
 
 const getFriends = async (req, res) => {
   try {
+    // ⭐ Проверяем наличие userId
+    if (!req.userId) {
+      console.error('❌ getFriends: req.userId is null!');
+      return res.status(401).json({ error: 'Пользователь не авторизован' });
+    }
+    
     const user = await User.findById(req.userId)
       .populate('friends', 'username displayName avatarUrl isOnline bio');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    
+    // ⭐ Защита от null friends
     res.json(user.friends || []);
   } catch (err) {
-    console.error(err);
+    console.error('❌ Ошибка getFriends:', err);
     res.status(500).json({ error: 'Ошибка получения списка друзей' });
   }
 };
 
 const getFriendRequests = async (req, res) => {
   try {
+    // ⭐ Проверяем наличие userId
+    if (!req.userId) {
+      console.error('❌ getFriendRequests: req.userId is null!');
+      return res.status(401).json({ error: 'Пользователь не авторизован' });
+    }
+    
     const user = await User.findById(req.userId)
       .populate('friendRequests', 'username displayName avatarUrl isOnline');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    
+    // ⭐ Защита от null friendRequests
     res.json(user.friendRequests || []);
   } catch (err) {
-    console.error(err);
+    console.error('❌ Ошибка getFriendRequests:', err);
     res.status(500).json({ error: 'Ошибка получения заявок' });
   }
 };
 
+// controllers/friendController.js - sendFriendRequest
+
 const sendFriendRequest = async (req, res) => {
   try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Пользователь не авторизован' });
+    }
+    
     const targetUser = await User.findById(req.params.id);
     if (!targetUser) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
     
-    if (targetUser.friendRequests.includes(req.userId)) {
+    if (targetUser.friendRequests && targetUser.friendRequests.includes(req.userId)) {
       return res.status(400).json({ error: 'Заявка уже отправлена' });
     }
     
-    if (targetUser.friends.includes(req.userId)) {
+    if (targetUser.friends && targetUser.friends.includes(req.userId)) {
       return res.status(400).json({ error: 'Вы уже друзья' });
     }
     
+    if (!targetUser.friendRequests) targetUser.friendRequests = [];
     targetUser.friendRequests.push(req.userId);
     await targetUser.save();
     
     const sender = await User.findById(req.userId).select('username displayName avatarUrl');
-    req.io.to(targetUser._id.toString()).emit('newFriendRequest', sender);
+    
+    // Отправляем уведомление через сокет
+    const io = req.app.get('io');
+    if (io) {
+      console.log(`📨 Отправляем заявку в комнату user:${targetUser._id}`);
+      io.to(`user:${targetUser._id}`).emit('new_friend_request', {
+        _id: sender._id,
+        username: sender.username,
+        displayName: sender.displayName || sender.username,
+        avatarUrl: sender.avatarUrl
+      });
+    }
     
     res.json({ message: 'Заявка отправлена', user: sender });
   } catch (err) {
@@ -52,41 +95,69 @@ const sendFriendRequest = async (req, res) => {
 
 const acceptFriendRequest = async (req, res) => {
   try {
+    console.log('📥 acceptFriendRequest вызван, userId:', req.userId, 'friendId:', req.params.id);
+    
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Пользователь не авторизован' });
+    }
+    
     const me = await User.findById(req.userId);
+    if (!me) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    
     const newFriendId = req.params.id;
 
-    if (!me.friendRequests.includes(newFriendId)) {
+    if (!me.friendRequests || !me.friendRequests.includes(newFriendId)) {
       return res.status(400).json({ error: 'Заявка не найдена' });
     }
 
+    if (!me.friends) me.friends = [];
     me.friends.push(newFriendId);
     me.friendRequests = me.friendRequests.filter(id => id.toString() !== newFriendId);
     await me.save();
 
     const newFriend = await User.findById(newFriendId);
-    if (!newFriend.friends.includes(me._id)) {
-      newFriend.friends.push(me._id);
-      await newFriend.save();
+    if (newFriend) {
+      if (!newFriend.friends) newFriend.friends = [];
+      if (!newFriend.friends.includes(me._id)) {
+        newFriend.friends.push(me._id);
+        await newFriend.save();
+      }
     }
 
     const updatedMe = await User.findById(req.userId)
       .populate('friends', 'username displayName avatarUrl isOnline')
       .populate('friendRequests', 'username displayName avatarUrl');
     
+    console.log('📤 Возвращаем:', {
+      friendsCount: updatedMe.friends?.length || 0,
+      friendRequestsCount: updatedMe.friendRequests?.length || 0
+    });
+    
     res.json({ 
       message: 'Теперь вы друзья',
-      friends: updatedMe.friends,
-      friendRequests: updatedMe.friendRequests
+      friends: updatedMe.friends || [],
+      friendRequests: updatedMe.friendRequests || []
     });
   } catch (err) {
-    console.error(err);
+    console.error('Ошибка принятия заявки:', err);
     res.status(500).json({ error: 'Ошибка принятия заявки' });
   }
 };
 
 const declineFriendRequest = async (req, res) => {
   try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Пользователь не авторизован' });
+    }
+    
     const me = await User.findById(req.userId);
+    if (!me) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    
+    if (!me.friendRequests) me.friendRequests = [];
     me.friendRequests = me.friendRequests.filter(id => id.toString() !== req.params.id);
     await me.save();
     
@@ -95,7 +166,7 @@ const declineFriendRequest = async (req, res) => {
     
     res.json({ 
       message: 'Заявка отклонена',
-      friendRequests: updatedMe.friendRequests
+      friendRequests: updatedMe.friendRequests || []
     });
   } catch (err) {
     console.error(err);
@@ -105,10 +176,16 @@ const declineFriendRequest = async (req, res) => {
 
 const cancelFriendRequest = async (req, res) => {
   try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Пользователь не авторизован' });
+    }
+    
     const targetUser = await User.findById(req.params.id);
     if (!targetUser) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
+    
+    if (!targetUser.friendRequests) targetUser.friendRequests = [];
     targetUser.friendRequests = targetUser.friendRequests.filter(id => id.toString() !== req.userId);
     await targetUser.save();
     res.json({ message: 'Заявка отменена' });
@@ -118,31 +195,32 @@ const cancelFriendRequest = async (req, res) => {
   }
 };
 
-// ===== ДОБАВЬ ЭТУ ФУНКЦИЮ =====
 const removeFriend = async (req, res) => {
   try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Пользователь не авторизован' });
+    }
+    
     const { friendId } = req.body;
     
     if (!friendId) {
       return res.status(400).json({ error: 'ID друга не указан' });
     }
     
-    // Удаляем друга из списка текущего пользователя
     const currentUser = await User.findByIdAndUpdate(
       req.userId,
       { $pull: { friends: friendId } },
       { new: true }
     );
     
-    // Удаляем текущего пользователя из списка друга
+    if (!currentUser) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    
     await User.findByIdAndUpdate(
       friendId,
       { $pull: { friends: req.userId } }
     );
-    
-    if (!currentUser) {
-      return res.status(404).json({ error: 'Пользователь не найден' });
-    }
     
     console.log(`✅ Пользователь ${req.userId} удалил из друзей ${friendId}`);
     res.json({ success: true, message: 'Друг удален' });
@@ -159,5 +237,5 @@ module.exports = {
   acceptFriendRequest,
   declineFriendRequest,
   cancelFriendRequest,
-  removeFriend // ДОБАВЬ ЭТУ СТРОКУ
+  removeFriend
 };

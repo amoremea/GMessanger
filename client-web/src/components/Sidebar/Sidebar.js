@@ -1,27 +1,41 @@
-import React, { useState } from 'react';
+// components/Sidebar/Sidebar.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
+import React, { useState, useEffect } from 'react'; // ⭐ ДОБАВИЛИ useEffect
 import { useAuth } from '../../hooks/useAuth';
 import { useFriends } from '../../hooks/useFriends';
 import { useSearch } from '../../hooks/useSearch';
 import { useTheme } from '../../hooks/useTheme';
+import { useNotification } from '../../contexts/NotificationContext';
 import { Avatar } from '../Common/Avatar';
+import { NotificationBell } from '../Common/NotificationBell';
 import { SettingsMenu } from './SettingsMenu';
 import { SearchBar } from './SearchBar';
 import { ResizeHandle } from '../Common/ResizeHandle';
 
 export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupModal, onOpenProfile }) => {
   const { user, logout } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const { 
     friends, 
     friendRequests, 
     loadFriends, 
+    loadFriendRequests,
+    loadAllData,
     acceptFriendRequest, 
     declineFriendRequest, 
     removeFriend 
-  } = useFriends(); // Убрали лишние переменные
+  } = useFriends();
   const { theme, changeTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('chats');
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
+
+  // ⭐ ДОБАВЛЯЕМ: принудительное обновление при открытии чата
+  useEffect(() => {
+    if (currentChat) {
+      // Обновляем список чатов, чтобы обнулить счетчик
+      loadAllData();
+    }
+  }, [currentChat, loadAllData]);
 
   const startResizing = (e) => {
     const handleMouseMove = (m) => {
@@ -36,33 +50,59 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleCreatePrivateChat = async (targetUserId) => {
-    await createChat([user?.userId, targetUserId], false);
+  const handleAcceptRequest = async (userId, userName) => {
+    console.log('🔄 Принимаем заявку:', userId, userName);
+    const result = await acceptFriendRequest(userId);
+    if (result.success) {
+      showSuccess(`${userName} теперь ваш друг!`);
+      setTimeout(() => {
+        loadAllData();
+        loadFriends();
+        loadFriendRequests();
+      }, 500);
+    }
   };
 
-  const getChatDisplayName = (chat) => {
-    if (chat.isGroup) {
-      return chat.name;
+  const handleDeclineRequest = async (userId, userName) => {
+    console.log('🔄 Отклоняем заявку:', userId, userName);
+    const result = await declineFriendRequest(userId);
+    if (result.success) {
+      showError(`Заявка от ${userName} отклонена`);
+      setTimeout(() => {
+        loadFriendRequests();
+      }, 500);
     }
-    const otherUser = chat.participants?.find(p => p._id !== user?.userId);
-    return otherUser?.displayName || otherUser?.username || 'Чат';
   };
 
-  const getChatAvatar = (chat) => {
-    if (chat.isGroup) {
-      return { isGroup: true, groupName: chat.name };
-    }
-    return chat.participants?.find(p => p._id !== user?.userId);
+  const getLastMessageText = (chat) => {
+    if (!chat.lastMessage) return 'Нет сообщений';
+    if (chat.lastMessage.text) return chat.lastMessage.text;
+    if (chat.lastMessage.fileUrl) return '📎 Файл';
+    return 'Новое сообщение';
+  };
+
+  const getLastMessageTime = (chat) => {
+    if (!chat.lastMessage || !chat.lastMessage.createdAt) return '';
+    const date = new Date(chat.lastMessage.createdAt);
+    const now = new Date();
+    const diff = now - date;
+    
+    if (diff < 60000) return 'только что';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} мин`;
+    if (diff < 86400000) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString();
   };
 
   return (
     <div className="sidebar d-flex flex-column h-100" style={{ width: sidebarWidth }}>
       <ResizeHandle onMouseDown={startResizing} />
 
-      <div className="overflow-auto flex-grow-1 p-2">
+      <div className="p-2 border-bottom d-flex justify-content-between align-items-center">
         <SearchBar onOpenProfile={onOpenProfile} />
+        <NotificationBell />
+      </div>
 
-        {/* Стильные вкладки */}
+      <div className="overflow-auto flex-grow-1 p-2">
         <div className="tabs-container">
           <button
             className={`tab-btn ${activeTab === 'chats' ? 'active' : ''}`}
@@ -70,17 +110,28 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
           >
             <i className="bi bi-chat-dots me-1"></i>
             Чаты
+            {chats.filter(c => (c.unreadCount?.[user?.userId] || 0) > 0).length > 0 && (
+              <span className="tab-badge">
+                {chats.filter(c => (c.unreadCount?.[user?.userId] || 0) > 0).length}
+              </span>
+            )}
           </button>
           <button
             className={`tab-btn ${activeTab === 'friends' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('friends'); loadFriends(); }}
+            onClick={() => { 
+              setActiveTab('friends'); 
+              loadFriends(); 
+            }}
           >
             <i className="bi bi-people me-1"></i>
             Друзья
           </button>
           <button
             className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
-            onClick={() => setActiveTab('requests')}
+            onClick={() => { 
+              setActiveTab('requests'); 
+              loadFriendRequests();
+            }}
           >
             <i className="bi bi-person-plus me-1"></i>
             Заявки
@@ -90,7 +141,6 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
           </button>
         </div>
 
-        {/* Вкладка Чаты */}
         {activeTab === 'chats' && (
           <>
             <button className="btn btn-outline-primary w-100 mb-3 rounded-pill" onClick={onOpenGroupModal}>
@@ -106,9 +156,12 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
               </div>
             ) : (
               chats.map(chat => {
-                const displayName = getChatDisplayName(chat);
-                const avatarUser = getChatAvatar(chat);
+                const other = chat.participants?.find(p => p._id !== user?.userId);
+                const displayName = chat.isGroup ? chat.name : (other?.displayName || other?.username || 'Чат');
                 const isActive = currentChat === chat._id;
+                const unreadCount = chat.unreadCount?.[user?.userId] || 0;
+                const lastMessageText = getLastMessageText(chat);
+                const lastMessageTime = getLastMessageTime(chat);
                 
                 return (
                   <div
@@ -125,12 +178,20 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
                           </div>
                         </div>
                       ) : (
-                        <Avatar user={avatarUser} size={38} showBadge={true} />
+                        <Avatar user={other} size={38} showBadge={true} />
                       )}
                       <div className="flex-grow-1">
-                        <div className="fw-bold">{displayName}</div>
-                        <div className="small text-muted text-truncate">
-                          {chat.lastMessage?.text || 'Нет сообщений'}
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div className="fw-bold">{displayName}</div>
+                          <div className="small text-muted">{lastMessageTime}</div>
+                        </div>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div className={`small ${unreadCount > 0 ? 'fw-bold text-primary' : 'text-muted'} text-truncate`} style={{ maxWidth: '150px' }}>
+                            {lastMessageText}
+                          </div>
+                          {unreadCount > 0 && (
+                            <span className="badge bg-primary rounded-pill">{unreadCount}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -141,7 +202,6 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
           </>
         )}
 
-        {/* Вкладка Друзья */}
         {activeTab === 'friends' && (
           <>
             <div className="small text-muted fw-bold mb-2 ps-2">МОИ ДРУЗЬЯ</div>
@@ -162,7 +222,7 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
                   <div className="d-flex gap-1">
                     <button
                       className="btn btn-sm btn-outline-primary rounded-circle"
-                      onClick={() => handleCreatePrivateChat(f._id)}
+                      onClick={() => createChat([user?.userId, f._id], false)}
                       style={{ width: 32, height: 32 }}
                       title="Написать"
                     >
@@ -173,6 +233,8 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
                       onClick={async () => {
                         if (window.confirm(`Удалить ${f.displayName || f.username} из друзей?`)) {
                           await removeFriend(f._id);
+                          showSuccess(`${f.displayName || f.username} удален из друзей`);
+                          await loadFriends();
                         }
                       }}
                       style={{ width: 32, height: 32 }}
@@ -187,7 +249,6 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
           </>
         )}
 
-        {/* Вкладка Заявки */}
         {activeTab === 'requests' && (
           <>
             <div className="small text-muted fw-bold mb-2 ps-2">ВХОДЯЩИЕ ЗАЯВКИ</div>
@@ -207,7 +268,7 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
                   <div className="d-flex gap-1">
                     <button 
                       className="btn btn-sm btn-success rounded-circle" 
-                      onClick={() => acceptFriendRequest(req._id)} 
+                      onClick={() => handleAcceptRequest(req._id, req.displayName || req.username)}
                       title="Принять"
                       style={{ width: 32, height: 32 }}
                     >
@@ -215,7 +276,7 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
                     </button>
                     <button 
                       className="btn btn-sm btn-danger rounded-circle" 
-                      onClick={() => declineFriendRequest(req._id)} 
+                      onClick={() => handleDeclineRequest(req._id, req.displayName || req.username)}
                       title="Отклонить"
                       style={{ width: 32, height: 32 }}
                     >

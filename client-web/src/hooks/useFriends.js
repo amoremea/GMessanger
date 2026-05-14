@@ -1,12 +1,37 @@
+// hooks/useFriends.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
 import { useState, useEffect, useCallback } from 'react';
 import { friendService } from '../services/friendService';
 import { useAuth } from './useAuth';
+import { useNotification } from '../contexts/NotificationContext';
 import socketService from '../services/socketService';
 
 export const useFriends = () => {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
+  const { showFriendRequest, showSuccess, showError } = useNotification();
   const [friends, setFriends] = useState([]);
   const [friendRequests, setFriendRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadAllData = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const [friendsRes, requestsRes] = await Promise.all([
+        friendService.getFriends(),
+        friendService.getFriendRequests()
+      ]);
+      setFriends(friendsRes.data || []);
+      setFriendRequests(requestsRes.data || []);
+      console.log('📊 Загружено:', {
+        friends: friendsRes.data?.length || 0,
+        requests: requestsRes.data?.length || 0
+      });
+    } catch (err) {
+      console.error('Ошибка загрузки:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
 
   const loadFriends = useCallback(async () => {
     if (!token) return;
@@ -29,101 +54,128 @@ export const useFriends = () => {
   }, [token]);
 
   useEffect(() => {
-    loadFriends();
-    loadFriendRequests();
-  }, [loadFriends, loadFriendRequests]);
+    loadAllData();
+  }, [loadAllData]);
 
   // Socket listener для новых заявок
   useEffect(() => {
-    if (!socketService.socket) return;
+    if (!socketService.socket) {
+      console.log('⚠️ Socket не инициализирован');
+      return;
+    }
     
     const handleNewRequest = (sender) => {
-      console.log('Новая заявка от:', sender);
+      console.log('🎉 НОВАЯ ЗАЯВКА ПОЛУЧЕНА:', sender);
+      
       setFriendRequests(prev => {
-        if (prev.find(r => r._id === sender._id)) return prev;
+        if (prev.some(r => r._id === sender._id)) return prev;
         return [sender, ...prev];
       });
+      
+      showFriendRequest(
+        sender,
+        () => acceptFriendRequest(sender._id),
+        () => declineFriendRequest(sender._id)
+      );
     };
     
-    socketService.on('newFriendRequest', handleNewRequest);
+    socketService.on('new_friend_request', handleNewRequest);
     
     return () => {
-      socketService.off('newFriendRequest', handleNewRequest);
+      socketService.off('new_friend_request');
     };
-  }, []);
+  }, [socketService.socket]);
 
+  // ⭐ ОТПРАВКА ЗАЯВКИ - ИСПОЛЬЗУЕМ HTTP (НАДЕЖНЕЕ)
   const sendFriendRequest = useCallback(async (friendId) => {
     try {
-      await friendService.sendRequest(friendId);
-      alert('Заявка отправлена');
-      await loadFriendRequests();
+      console.log('📤 Отправляем заявку через HTTP:', friendId);
+      const res = await friendService.sendRequest(friendId);
+      console.log('✅ Ответ сервера:', res.data);
+      showSuccess('Заявка отправлена');
+      setTimeout(() => loadFriendRequests(), 500);
       return { success: true };
     } catch (err) {
-      alert(err.response?.data?.error || 'Ошибка отправки заявки');
+      console.error('❌ Ошибка:', err);
+      showError(err.response?.data?.error || 'Ошибка отправки заявки');
       return { success: false };
     }
-  }, [loadFriendRequests]);
+  }, [loadFriendRequests, showSuccess, showError]);
 
   const acceptFriendRequest = useCallback(async (friendId) => {
     try {
+      console.log('✅ Принимаем заявку:', friendId);
       const res = await friendService.acceptRequest(friendId);
-      alert('Заявка принята');
+      
+      showSuccess('Заявка принята');
       setFriends(res.data.friends || []);
       setFriendRequests(res.data.friendRequests || []);
+      
+      setTimeout(() => {
+        loadFriends();
+        loadFriendRequests();
+      }, 300);
+      
       return { success: true };
     } catch (err) {
-      alert('Ошибка принятия заявки');
+      console.error('Ошибка принятия заявки:', err);
+      showError('Ошибка принятия заявки');
       return { success: false };
     }
-  }, []);
+  }, [loadFriends, loadFriendRequests, showSuccess, showError]);
 
   const declineFriendRequest = useCallback(async (friendId) => {
     try {
+      console.log('❌ Отклоняем заявку:', friendId);
       const res = await friendService.declineRequest(friendId);
-      alert('Заявка отклонена');
+      
+      showError('Заявка отклонена');
       setFriendRequests(res.data.friendRequests || []);
+      setTimeout(() => loadFriendRequests(), 300);
+      
       return { success: true };
     } catch (err) {
-      alert('Ошибка отклонения заявки');
+      console.error('Ошибка отклонения заявки:', err);
+      showError('Ошибка отклонения заявки');
       return { success: false };
     }
-  }, []);
+  }, [loadFriendRequests, showError]);
 
   const cancelFriendRequest = useCallback(async (friendId) => {
     try {
       await friendService.cancelRequest(friendId);
-      alert('Заявка отменена');
+      showSuccess('Заявка отменена');
       await loadFriendRequests();
       return { success: true };
     } catch (err) {
-      alert('Ошибка отмены заявки');
+      showError('Ошибка отмены заявки');
       return { success: false };
     }
-  }, [loadFriendRequests]);
+  }, [loadFriendRequests, showSuccess, showError]);
 
-  // ===== ДОБАВЬ ЭТУ ФУНКЦИЮ =====
   const removeFriend = useCallback(async (friendId) => {
     try {
       await friendService.removeFriend(friendId);
-      alert('Пользователь удален из друзей');
+      showSuccess('Пользователь удален из друзей');
       await loadFriends();
       return { success: true };
     } catch (err) {
-      console.error('Ошибка удаления друга:', err);
-      alert('Ошибка удаления друга');
+      showError('Ошибка удаления друга');
       return { success: false };
     }
-  }, [loadFriends]);
+  }, [loadFriends, showSuccess, showError]);
 
   return {
     friends,
     friendRequests,
+    loading,
     loadFriends,
     loadFriendRequests,
+    loadAllData,
     sendFriendRequest,
     acceptFriendRequest,
     declineFriendRequest,
     cancelFriendRequest,
-    removeFriend, // ДОБАВЬ ЭТУ СТРОКУ
+    removeFriend,
   };
 };

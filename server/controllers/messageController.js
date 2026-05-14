@@ -1,4 +1,5 @@
 const Message = require('../models/Message');
+const Chat = require('../models/Chat'); // ⭐ ДОБАВЬТЕ ЭТУ СТРОКУ
 
 const getMessages = async (req, res) => {
   try {
@@ -46,8 +47,39 @@ const uploadFile = async (req, res) => {
   }
 };
 
+// ⭐ ДОБАВЬТЕ ЭТУ ФУНКЦИЮ
+const markAsRead = async (req, res) => {
+  try {
+    const { chatId } = req.body;
+    
+    if (!chatId) {
+      return res.status(400).json({ error: 'Chat ID required' });
+    }
+    
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+    
+    // Обнуляем счетчик для текущего пользователя
+    if (!chat.unreadCount) {
+      chat.unreadCount = {};
+    }
+    chat.unreadCount[req.userId] = 0;
+    
+    await chat.save();
+    
+    console.log(`✅ Пользователь ${req.userId} прочитал чат ${chatId}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Ошибка markAsRead:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 module.exports = {
   getMessages,
   deleteMessage,
-  uploadFile
+  uploadFile,
+  markAsRead // ⭐ ДОБАВЬТЕ ЭТУ СТРОКУ
 };

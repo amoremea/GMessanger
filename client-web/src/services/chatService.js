@@ -1,3 +1,4 @@
+// services/chatService.js
 import api from './api';
 
 export const chatService = {
@@ -9,4 +10,5 @@ export const chatService = {
   uploadFile: (formData) => api.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  markAsRead: (chatId) => api.post('/mark-read', { chatId }), // ⭐ УБЕДИТЕСЬ ЧТО ЭТОТ МЕТОД ЕСТЬ
 };

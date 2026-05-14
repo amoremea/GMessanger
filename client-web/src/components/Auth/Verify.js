@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../contexts/NotificationContext';
+import toast from 'react-hot-toast';
 
 export const Verify = ({ onBackToLogin }) => {
   const { email, verify, resendCode } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const [code, setCode] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const [error, setError] = useState('');
@@ -17,8 +20,12 @@ export const Verify = ({ onBackToLogin }) => {
 
   const handleVerify = async () => {
     const result = await verify(code);
-    if (!result.success) {
+    if (result.success) {
+      showSuccess('Email подтвержден! Теперь вы можете войти');
+      setTimeout(() => onBackToLogin(), 1500);
+    } else {
       setError(result.error);
+      showError(result.error);
     }
   };
 
@@ -27,8 +34,10 @@ export const Verify = ({ onBackToLogin }) => {
     const result = await resendCode();
     if (result.success) {
       setResendTimer(60);
+      showSuccess('Новый код отправлен на почту');
     } else {
       setError(result.error);
+      showError(result.error);
     }
   };
 
@@ -37,8 +46,6 @@ export const Verify = ({ onBackToLogin }) => {
       <div className="auth-image-verify"></div>
       <h4 className="auth-title">{email}</h4>
       <p className="auth-subtitle">Мы отправили код подтверждения на вашу почту. Введите его ниже.</p>
-      <div className="text-danger"> ВНИМАНИЕ! </div>
-      <div className="text-danger"> КОД ПРИХОДИТ В ТЕЧЕНИЕ 5 МИНУТ </div>
       <input
         className="tg-input code-input"
         placeholder="Код"
