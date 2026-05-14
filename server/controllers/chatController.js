@@ -117,39 +117,40 @@ exports.getMessages = async (req, res) => {
   }
 };
 
-// ОТПРАВКА СООБЩЕНИЯ (Этой функции не хватало в твоем файле)
 exports.sendMessage = async (req, res) => {
+  console.log('=== ПОПЫТКА СОХРАНЕНИЯ ===');
+  console.log('Данные из тела:', req.body);
+  console.log('ID отправителя:', req.userId);
+
   try {
     const { chatId, text, fileUrl } = req.body;
 
-    if (!chatId || (!text && !fileUrl)) {
-      return res.status(400).json({ error: 'Неверные данные сообщения' });
+    // Проверяем, что ID чата вообще пришел
+    if (!chatId) {
+       console.log('❌ Ошибка: chatId не пришел с фронтенда!');
+       return res.status(400).json({ error: 'chatId is required' });
     }
 
     const newMessage = new Message({
-      chatId,
+      chatId: chatId,
       sender: req.userId,
-      text,
-      fileUrl
+      text: text,
+      fileUrl: fileUrl
     });
 
-    await newMessage.save();
+    const saved = await newMessage.save();
+    console.log('✅ УСПЕХ! Сообщение в базе:', saved._id);
 
-    const populatedMessage = await Message.findById(newMessage._id)
-      .populate('sender', 'username displayName avatarUrl');
-
-    // Обновляем время последнего изменения в чате
-    await Chat.findByIdAndUpdate(chatId, { updatedAt: Date.now() });
-
-    // Уведомление через сокеты
+    // Сокеты
     const io = req.app.get('socketio');
     if (io) {
-      io.to(chatId).emit('newMessage', populatedMessage);
+      io.to(chatId).emit('newMessage', saved);
     }
 
-    res.status(201).json(populatedMessage);
+    res.status(201).json(saved);
   } catch (err) {
-    console.error('Ошибка отправки сообщения:', err);
-    res.status(500).json({ error: 'Ошибка сервера при отправке' });
+    // ВОТ ТУТ МЫ УВИДИМ ПРАВДУ
+    console.error('❌ ЖЕСТКАЯ ОШИБКА МОНГИ:', err); 
+    res.status(500).json({ error: err.message });
   }
 };

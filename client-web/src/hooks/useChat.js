@@ -83,6 +83,8 @@ export const useChat = () => {
     if (!currentChat) return false;
 
     let fileUrl = null;
+
+    // 1. Загрузка файла, если он есть
     if (file) {
       const formData = new FormData();
       formData.append('file', file);
@@ -90,10 +92,12 @@ export const useChat = () => {
         const res = await chatService.uploadFile(formData);
         fileUrl = res.data.fileUrl;
       } catch (err) {
+        console.error('Ошибка загрузки файла:', err);
         return false;
       }
     }
 
+    // 2. Создаем временное сообщение для мгновенного отображения (UI)
     const tempId = `temp_${Date.now()}`;
     const tempMessage = {
       _id: tempId,
@@ -102,12 +106,34 @@ export const useChat = () => {
       fileUrl,
       sender: { _id: user?.userId, username: user?.username },
       createdAt: new Date(),
-      isPending: true
+      isPending: true // Флаг, что сообщение еще не в базе
     };
     
+    // Добавляем в стейт сразу, чтобы юзер не ждал
     setMessages(prev => [...prev, tempMessage]);
-    socketService.sendMessage({ chatId: currentChat, text, fileUrl });
-    return true;
+
+    try {
+      // 3. КРИТИЧЕСКИЙ ШАГ: Сохраняем в MongoDB через контроллер
+      // Мы вызываем именно API метод, который идет на POST /api/messages
+      const res = await chatService.sendMessage(currentChat, text, fileUrl);
+      const savedMessage = res.data;
+
+      // 4. Заменяем временное сообщение на реальное из базы
+      setMessages(prev => 
+        prev.map(m => m._id === tempId ? savedMessage : m)
+      );
+
+      // 5. Уведомляем сокет-сервер (чтобы другие увидели сообщение)
+      // ВАЖНО: передаем уже сохраненное сообщение с нормальным _id из базы
+      socketService.sendMessage(savedMessage);
+
+      return true;
+    } catch (err) {
+      console.error('Ошибка сохранения сообщения в БД:', err);
+      // Если не сохранилось — удаляем временное сообщение, чтобы не путать юзера
+      setMessages(prev => prev.filter(m => m._id !== tempId));
+      return false;
+    }
   }, [currentChat, user]);
 
   useEffect(() => {
