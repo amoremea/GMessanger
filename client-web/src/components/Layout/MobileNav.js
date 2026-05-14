@@ -14,10 +14,12 @@ export const MobileNav = ({ children, isOpen, onClose }) => {
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
+      document.body.style.height = '100%';
     } else {
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
+      document.body.style.height = '';
     }
     
     return () => {
@@ -25,6 +27,7 @@ export const MobileNav = ({ children, isOpen, onClose }) => {
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
+      document.body.style.height = '';
     };
   }, [isOpen, onClose]);
 
