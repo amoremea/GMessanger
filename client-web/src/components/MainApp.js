@@ -122,7 +122,7 @@ export const MainApp = () => {
               onOpenGroupInfo={() => setIsGroupInfoOpen(true)}
               isMobile={true}
               onBack={handleCloseChat}
-              onMenuOpen={handleOpenMenu}
+              onMenuOpen={handleOpenMenu}  // ДОБАВЬТЕ ЭТУ СТРОКУ
             />
           </div>
         </>

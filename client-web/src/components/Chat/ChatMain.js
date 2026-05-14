@@ -1,4 +1,4 @@
-// components/Chat/ChatMain.js - Полностью адаптивная версия
+// components/Chat/ChatMain.js
 import React, { useRef, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../Common/Avatar';
@@ -13,7 +13,8 @@ export const ChatMain = ({
   onOpenProfile, 
   onOpenGroupInfo,
   isMobile,
-  onBack
+  onBack,
+  onMenuOpen  // ДОБАВЬТЕ ЭТУ СТРОКУ
 }) => {
   const { user } = useAuth();
   const [text, setText] = useState('');
@@ -81,12 +82,18 @@ export const ChatMain = ({
         <div className="chat-placeholder-content">
           <i className="bi bi-chat-dots"></i>
           <p>Выберите чат, чтобы начать общение</p>
+          {isMobile && onMenuOpen && (
+            <button className="open-chats-btn" onClick={onMenuOpen}>
+              <i className="bi bi-list"></i>
+              Список чатов
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
-    return (
+  return (
     <div className="chat-main-container">
       {/* Хедер чата */}
       <div className="chat-header">
@@ -95,9 +102,11 @@ export const ChatMain = ({
             <button className="chat-header-back" onClick={onBack}>
               <i className="bi bi-arrow-left"></i>
             </button>
-            <button className="chat-header-menu" onClick={onMenuOpen}>
-              <i className="bi bi-list"></i>
-            </button>
+            {onMenuOpen && (
+              <button className="chat-header-menu" onClick={onMenuOpen}>
+                <i className="bi bi-list"></i>
+              </button>
+            )}
           </>
         )}
         <div className="chat-header-info" onClick={handleHeaderClick}>
@@ -120,7 +129,64 @@ export const ChatMain = ({
 
       {/* Область сообщений */}
       <div className="messages-area">
-        {/* ... сообщения ... */}
+        {messages.length === 0 ? (
+          <div className="messages-empty">
+            <i className="bi bi-chat-square-text"></i>
+            <p>Нет сообщений</p>
+            <span>Напишите первое сообщение</span>
+          </div>
+        ) : (
+          messages.map((msg, index) => {
+            const isMe = msg.sender?._id === user?.userId || msg.sender === user?.userId;
+            const fileUrl = getFileUrl(msg.fileUrl);
+            const isImage = fileUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+
+            return (
+              <div key={msg._id || index} className={`message-wrapper ${isMe ? 'own' : 'other'}`}>
+                {!isMe && isGroup && (
+                  <div className="message-avatar" onClick={() => onOpenProfile(msg.sender)}>
+                    <Avatar user={msg.sender} size={isMobile ? 28 : 32} />
+                  </div>
+                )}
+                <div className={`message-bubble ${isMe ? 'message-sent' : 'message-received'}`}>
+                  {!isMe && isGroup && (
+                    <div className="message-sender">
+                      {msg.sender?.displayName || msg.sender?.username}
+                    </div>
+                  )}
+                  
+                  {msg.fileUrl && (
+                    <div className="message-attachment">
+                      {isImage ? (
+                        <img 
+                          src={fileUrl} 
+                          alt="attachment" 
+                          onClick={() => window.open(fileUrl, '_blank')}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <a href={fileUrl} target="_blank" rel="noreferrer">
+                          <i className="bi bi-file-earmark-arrow-down"></i>
+                          Скачать файл
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  
+                  {msg.text && (
+                    <div className="message-text">
+                      {msg.text}
+                    </div>
+                  )}
+                  
+                  <div className="message-time">
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 
