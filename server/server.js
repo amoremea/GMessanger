@@ -48,9 +48,11 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    // В продакшене origin может быть undefined, если запрос идет с того же домена
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log('CORS заблокировал origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
