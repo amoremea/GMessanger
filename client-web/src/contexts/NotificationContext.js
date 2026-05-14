@@ -94,14 +94,34 @@ export const NotificationProvider = ({ children }) => {
     });
   }, []);
 
-  const addNotification = useCallback((notification) => {
-    setNotifications(prev => [notification, ...prev]);
+    const addNotification = useCallback((notification) => {
+    const newNotification = {
+        ...notification,
+        id: Date.now() + Math.random().toString(36).substr(2, 9),
+        createdAt: new Date().toISOString(),
+        time: formatRelativeTime(new Date())
+    };
+    setNotifications(prev => [newNotification, ...prev]);
     
-    // Автоматически удаляем через 5 секунд
     setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== notification.id));
-    }, 5000);
-  }, []);
+        setNotifications(prev => prev.filter(n => n.id !== newNotification.id));
+    }, 8000);
+    }, []);
+
+    // Добавьте функцию форматирования времени
+    const formatRelativeTime = (date) => {
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'только что';
+    if (minutes < 60) return `${minutes} мин назад`;
+    if (hours < 24) return `${hours} ч назад`;
+    if (days === 1) return 'вчера';
+    return `${days} дн назад`;
+    };
 
   const removeNotification = useCallback((id) => {
     setNotifications(prev => prev.filter(n => n.id !== id));

@@ -1,4 +1,4 @@
-// services/socketService.js - удалите testConnection
+// services/socketService.js
 import io from 'socket.io-client';
 import { SOCKET_URL } from './api';
 
@@ -22,6 +22,7 @@ class SocketService {
     }
 
     console.log('🔄 Создаем новое socket соединение...');
+    console.log('🔌 SOCKET_URL:', SOCKET_URL);
     
     this.socket = io(SOCKET_URL, {
       auth: { token },

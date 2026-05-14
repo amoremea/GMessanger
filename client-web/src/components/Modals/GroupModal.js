@@ -1,3 +1,4 @@
+// components/Modals/GroupModal.js
 import React, { useState } from 'react';
 import { Avatar } from '../Common/Avatar';
 import { useFriends } from '../../hooks/useFriends';
@@ -25,68 +26,80 @@ export const GroupModal = ({ onClose }) => {
       return;
     }
 
-    // ВАЖНО: создаем массив участников, включая текущего пользователя
     const allParticipants = [user?.userId, ...selectedUsers];
-    console.log('👥 Создание группы с участниками:', allParticipants);
-    console.log('👤 Текущий пользователь:', user?.userId);
-    console.log('📋 Выбранные друзья:', selectedUsers);
-
     try {
-      const chat = await createChat(allParticipants, true, groupName);
-      console.log('✅ Группа создана:', chat);
+      await createChat(allParticipants, true, groupName);
       onClose();
     } catch (error) {
-      console.error("❌ Ошибка при создании группы:", error);
+      console.error("Ошибка при создании группы:", error);
       alert("Ошибка при создании группы");
     }
   };
 
   return (
-    <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 2100 }}>
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content shadow-lg border-0 text-dark">
-          <div className="modal-header bg-primary text-white">
-            <h5 className="modal-title">Создание группы</h5>
-            <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-          </div>
-          <div className="modal-body">
-            <label className="small fw-bold mb-1">Название группы:</label>
+    <div className="group-modal">
+      <div className="group-modal-content">
+        <div className="group-modal-header">
+          <h3>Создание группы</h3>
+          <button className="group-modal-close" onClick={onClose}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
+        
+        <div className="group-modal-body">
+          <div className="group-name-field">
+            <label>Название группы</label>
             <input
-              className="form-control mb-3"
+              type="text"
               placeholder="Введите название..."
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
+              autoFocus
             />
+          </div>
 
-            <label className="small fw-bold mb-1">Выберите участников:</label>
-            <div className="overflow-auto" style={{ maxHeight: '200px' }}>
-              {friends.length > 0 ? (
-                friends.map(f => (
-                  <div
-                    key={f._id}
-                    className={`d-flex align-items-center p-2 mb-1 rounded cursor-pointer ${selectedUsers.includes(f._id) ? 'bg-primary text-white' : 'bg-light'}`}
-                    onClick={() => toggleUserSelection(f._id)}
-                  >
-                    <Avatar user={f} size={30} />
-                    <div className="ms-2">{f.displayName || f.username}</div>
-                    {selectedUsers.includes(f._id) && <i className="bi bi-check-lg ms-auto"></i>}
+          <div className="group-members-label">
+            <label>Выберите участников</label>
+            <span>{selectedUsers.length} выбрано</span>
+          </div>
+          
+          <div className="group-members-list">
+            {friends.length > 0 ? (
+              friends.map(f => (
+                <div
+                  key={f._id}
+                  className={`group-member-item ${selectedUsers.includes(f._id) ? 'selected' : ''}`}
+                  onClick={() => toggleUserSelection(f._id)}
+                >
+                  <Avatar user={f} size={40} />
+                  <div className="group-member-info">
+                    <div className="group-member-name">{f.displayName || f.username}</div>
+                    <div className="group-member-username">@{f.username}</div>
                   </div>
-                ))
-              ) : (
-                <p className="text-muted small">Сначала добавьте кого-нибудь в друзья</p>
-              )}
-            </div>
+                  {selectedUsers.includes(f._id) && (
+                    <i className="bi bi-check-circle-fill group-check-icon"></i>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="group-empty">
+                <i className="bi bi-people"></i>
+                <p>Нет друзей</p>
+                <span>Сначала добавьте кого-нибудь в друзья</span>
+              </div>
+            )}
           </div>
-          <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose}>Отмена</button>
-            <button
-              className="btn btn-primary"
-              onClick={handleCreate}
-              disabled={!groupName.trim() || selectedUsers.length === 0}
-            >
-              Создать
-            </button>
-          </div>
+        </div>
+        
+        <div className="group-modal-footer">
+          <button className="group-btn cancel" onClick={onClose}>Отмена</button>
+          <button 
+            className="group-btn create" 
+            onClick={handleCreate}
+            disabled={!groupName.trim() || selectedUsers.length === 0}
+          >
+            Создать группу
+          </button>
         </div>
       </div>
     </div>

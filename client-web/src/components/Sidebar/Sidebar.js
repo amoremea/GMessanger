@@ -1,19 +1,26 @@
-// components/Sidebar/Sidebar.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
-import React, { useState, useEffect } from 'react'; // ⭐ ДОБАВИЛИ useEffect
+// components/Sidebar/Sidebar.js
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useFriends } from '../../hooks/useFriends';
-import { useSearch } from '../../hooks/useSearch';
 import { useTheme } from '../../hooks/useTheme';
 import { useNotification } from '../../contexts/NotificationContext';
 import { Avatar } from '../Common/Avatar';
 import { NotificationBell } from '../Common/NotificationBell';
-import { SettingsMenu } from './SettingsMenu';
 import { SearchBar } from './SearchBar';
-import { ResizeHandle } from '../Common/ResizeHandle';
 
-export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupModal, onOpenProfile }) => {
+export const Sidebar = ({ 
+  chats, 
+  currentChat, 
+  openChat, 
+  createChat, 
+  onOpenGroupModal, 
+  onOpenProfile,
+  onMobileClose,
+  width,
+  onWidthChange
+}) => {
   const { user, logout } = useAuth();
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess } = useNotification();
   const { 
     friends, 
     friendRequests, 
@@ -27,50 +34,55 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
   const { theme, changeTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('chats');
   const [showSettings, setShowSettings] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [isResizing, setIsResizing] = useState(false);
 
-  // ⭐ ДОБАВЛЯЕМ: принудительное обновление при открытии чата
-  useEffect(() => {
-    if (currentChat) {
-      // Обновляем список чатов, чтобы обнулить счетчик
-      loadAllData();
-    }
-  }, [currentChat, loadAllData]);
-
+  // Обработчик изменения ширины
   const startResizing = (e) => {
-    const handleMouseMove = (m) => {
-      const newWidth = m.clientX;
-      if (newWidth > 200 && newWidth < 600) setSidebarWidth(newWidth);
-    };
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    e.preventDefault();
+    setIsResizing(true);
   };
 
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing) return;
+      const newWidth = e.clientX;
+      if (newWidth >= 260 && newWidth <= 500) {
+        onWidthChange?.(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, onWidthChange]);
+
   const handleAcceptRequest = async (userId, userName) => {
-    console.log('🔄 Принимаем заявку:', userId, userName);
     const result = await acceptFriendRequest(userId);
     if (result.success) {
       showSuccess(`${userName} теперь ваш друг!`);
-      setTimeout(() => {
-        loadAllData();
-        loadFriends();
-        loadFriendRequests();
-      }, 500);
+      loadAllData();
     }
   };
 
   const handleDeclineRequest = async (userId, userName) => {
-    console.log('🔄 Отклоняем заявку:', userId, userName);
     const result = await declineFriendRequest(userId);
     if (result.success) {
-      showError(`Заявка от ${userName} отклонена`);
-      setTimeout(() => {
-        loadFriendRequests();
-      }, 500);
+      showSuccess(`Заявка от ${userName} отклонена`);
+      loadFriendRequests();
     }
   };
 
@@ -93,25 +105,91 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
     return date.toLocaleDateString();
   };
 
-  return (
-    <div className="sidebar d-flex flex-column h-100" style={{ width: sidebarWidth }}>
-      <ResizeHandle onMouseDown={startResizing} />
+  // Функция для открытия профиля
+  const handleOpenMyProfile = () => {
+    onOpenProfile({ _id: user?.userId, username: user?.username, displayName: user?.displayName });
+    setShowSettings(false);
+  };
 
-      <div className="p-2 border-bottom d-flex justify-content-between align-items-center">
+  return (
+    <div className="sidebar" style={{ width: width ? `${width}px` : '320px' }}>
+      <div className="sidebar-resizer" onMouseDown={startResizing} />
+      
+      <div className="p-3 border-bottom">
         <SearchBar onOpenProfile={onOpenProfile} />
-        <NotificationBell />
+        <div className="d-flex justify-content-between align-items-center mt-2">
+          <NotificationBell />
+          
+          {/* Кнопка с тремя точками */}
+          <div className="settings-wrapper">
+            <button 
+              className={`settings-btn ${showSettings ? 'active' : ''}`}
+              onClick={() => setShowSettings(!showSettings)}
+            >
+              <i className="bi bi-three-dots-vertical"></i>
+            </button>
+            
+            {showSettings && (
+              <div className="settings-dropdown">
+                <div className="settings-menu">
+                  <button 
+                    className="settings-menu-item"
+                    onClick={handleOpenMyProfile}
+                  >
+                    <i className="bi bi-person-circle"></i>
+                    Мой профиль
+                  </button>
+                  
+                  <div className="settings-divider"></div>
+                  
+                  <div className="settings-theme-label">Тема оформления</div>
+                  <div className="settings-theme-buttons">
+                    <button 
+                      className={`settings-theme-btn ${theme === 'theme-light' ? 'active' : ''}`}
+                      onClick={() => changeTheme('theme-light')}
+                    >
+                      <i className="bi bi-sun"></i>
+                    </button>
+                    <button 
+                      className={`settings-theme-btn ${theme === 'theme-dark' ? 'active' : ''}`}
+                      onClick={() => changeTheme('theme-dark')}
+                    >
+                      <i className="bi bi-moon"></i>
+                    </button>
+                    <button 
+                      className={`settings-theme-btn ${theme === 'theme-ultra' ? 'active' : ''}`}
+                      onClick={() => changeTheme('theme-ultra')}
+                    >
+                      <i className="bi bi-palette"></i>
+                    </button>
+                  </div>
+                  
+                  <div className="settings-divider"></div>
+                  
+                  <button 
+                    className="settings-menu-item danger"
+                    onClick={logout}
+                  >
+                    <i className="bi bi-box-arrow-right"></i>
+                    Выйти
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="overflow-auto flex-grow-1 p-2">
+      <div className="overflow-auto flex-grow-1 p-3">
         <div className="tabs-container">
           <button
             className={`tab-btn ${activeTab === 'chats' ? 'active' : ''}`}
             onClick={() => setActiveTab('chats')}
           >
-            <i className="bi bi-chat-dots me-1"></i>
+            <i className="bi bi-chat-dots me-2"></i>
             Чаты
             {chats.filter(c => (c.unreadCount?.[user?.userId] || 0) > 0).length > 0 && (
-              <span className="tab-badge">
+              <span className="tab-badge ms-2">
                 {chats.filter(c => (c.unreadCount?.[user?.userId] || 0) > 0).length}
               </span>
             )}
@@ -123,7 +201,7 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
               loadFriends(); 
             }}
           >
-            <i className="bi bi-people me-1"></i>
+            <i className="bi bi-people me-2"></i>
             Друзья
           </button>
           <button
@@ -133,23 +211,32 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
               loadFriendRequests();
             }}
           >
-            <i className="bi bi-person-plus me-1"></i>
+            <i className="bi bi-person-plus me-2"></i>
             Заявки
             {friendRequests.length > 0 && (
-              <span className="tab-badge">{friendRequests.length}</span>
+              <span className="tab-badge ms-2">{friendRequests.length}</span>
             )}
           </button>
         </div>
 
         {activeTab === 'chats' && (
           <>
-            <button className="btn btn-outline-primary w-100 mb-3 rounded-pill" onClick={onOpenGroupModal}>
-              <i className="bi bi-people-fill me-2"></i>Создать группу
+            <button className="btn w-100 mb-4 rounded-pill" onClick={onOpenGroupModal} style={{
+              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+              color: 'white',
+              border: 'none',
+              padding: '12px',
+              fontWeight: 600
+            }}>
+              <i className="bi bi-people-fill me-2"></i>
+              Создать группу
             </button>
             
-            <div className="small text-muted fw-bold mb-2 ps-2">ВСЕ ЧАТЫ</div>
+            <div className="small fw-bold mb-2 px-2" style={{ color: 'var(--text-secondary)' }}>
+              ВСЕ ЧАТЫ
+            </div>
             {chats.length === 0 ? (
-              <div className="text-muted text-center p-3">
+              <div className="text-center p-4" style={{ color: 'var(--text-secondary)' }}>
                 <i className="bi bi-chat-dots fs-1"></i>
                 <p className="mt-2">Нет чатов</p>
                 <small>Найдите пользователя через поиск</small>
@@ -160,37 +247,62 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
                 const displayName = chat.isGroup ? chat.name : (other?.displayName || other?.username || 'Чат');
                 const isActive = currentChat === chat._id;
                 const unreadCount = chat.unreadCount?.[user?.userId] || 0;
-                const lastMessageText = getLastMessageText(chat);
-                const lastMessageTime = getLastMessageTime(chat);
                 
                 return (
                   <div
                     key={chat._id}
-                    className={`p-2 chat-item rounded mb-1 ${isActive ? 'active' : ''}`}
-                    onClick={() => openChat(chat._id)}
-                    style={{ cursor: 'pointer' }}
+                    className={`chat-item ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      openChat(chat._id);
+                      onMobileClose?.();
+                    }}
                   >
-                    <div className="d-flex align-items-center">
-                      {chat.isGroup ? (
-                        <div className="avatar-wrapper me-2">
-                          <div className="rounded-circle bg-primary text-white d-flex justify-content-center align-items-center" style={{ width: 38, height: 38 }}>
-                            <i className="bi bi-people-fill"></i>
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="avatar-wrapper">
+                        {chat.isGroup ? (
+                          <div className="avatar d-flex align-items-center justify-content-center" style={{
+                            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))'
+                          }}>
+                            <i className="bi bi-people-fill text-white" style={{ fontSize: 20 }}></i>
                           </div>
-                        </div>
-                      ) : (
-                        <Avatar user={other} size={38} showBadge={true} />
-                      )}
+                        ) : (
+                          <Avatar user={other} size={48} showBadge={true} />
+                        )}
+                      </div>
                       <div className="flex-grow-1">
                         <div className="d-flex justify-content-between align-items-center">
-                          <div className="fw-bold">{displayName}</div>
-                          <div className="small text-muted">{lastMessageTime}</div>
+                          <div className="fw-semibold" style={{ 
+                            color: isActive ? 'white' : 'var(--text-primary)',
+                            fontSize: '14px',
+                            fontWeight: 600
+                          }}>
+                            {displayName}
+                          </div>
+                          <div className="small" style={{ 
+                            color: isActive ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)',
+                            fontSize: '11px'
+                          }}>
+                            {getLastMessageTime(chat)}
+                          </div>
                         </div>
-                        <div className="d-flex justify-content-between align-items-center">
-                          <div className={`small ${unreadCount > 0 ? 'fw-bold text-primary' : 'text-muted'} text-truncate`} style={{ maxWidth: '150px' }}>
-                            {lastMessageText}
+                        <div className="d-flex justify-content-between align-items-center mt-1">
+                          <div className="small text-truncate" style={{ 
+                            maxWidth: '150px',
+                            color: isActive ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)',
+                            fontSize: '12px',
+                            fontWeight: unreadCount > 0 ? 600 : 400
+                          }}>
+                            {getLastMessageText(chat)}
                           </div>
                           {unreadCount > 0 && (
-                            <span className="badge bg-primary rounded-pill">{unreadCount}</span>
+                            <span className="badge rounded-pill" style={{
+                              background: isActive ? 'white' : 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                              color: isActive ? 'var(--accent-primary)' : 'white',
+                              fontSize: '10px',
+                              padding: '2px 8px'
+                            }}>
+                              {unreadCount}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -204,32 +316,41 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
 
         {activeTab === 'friends' && (
           <>
-            <div className="small text-muted fw-bold mb-2 ps-2">МОИ ДРУЗЬЯ</div>
+            <div className="small fw-bold mb-2 px-2" style={{ color: 'var(--text-secondary)' }}>
+              МОИ ДРУЗЬЯ
+            </div>
             {friends.length === 0 ? (
-              <div className="text-muted text-center p-3">
+              <div className="text-center p-4" style={{ color: 'var(--text-secondary)' }}>
                 <i className="bi bi-people fs-1"></i>
                 <p className="mt-2">Нет друзей</p>
                 <small>Найдите пользователей через поиск</small>
               </div>
             ) : (
               friends.map(f => (
-                <div key={f._id} className="p-2 chat-item d-flex align-items-center rounded mb-1">
-                  <Avatar user={f} size={38} showBadge={true} onClick={() => onOpenProfile(f)} />
-                  <div className="flex-grow-1 ms-2" onClick={() => onOpenProfile(f)}>
-                    <div className="fw-bold">{f.displayName || f.username}</div>
-                    <div className="small text-muted">@{f.username}</div>
+                <div key={f._id} className="chat-item d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-center gap-3" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(f)}>
+                    <Avatar user={f} size={48} showBadge={true} />
+                    <div>
+                      <div className="fw-semibold">{f.displayName || f.username}</div>
+                      <div className="small" style={{ color: 'var(--text-muted)' }}>@{f.username}</div>
+                    </div>
                   </div>
-                  <div className="d-flex gap-1">
+                  <div className="d-flex gap-2">
                     <button
-                      className="btn btn-sm btn-outline-primary rounded-circle"
+                      className="btn rounded-circle d-flex align-items-center justify-content-center"
                       onClick={() => createChat([user?.userId, f._id], false)}
-                      style={{ width: 32, height: 32 }}
-                      title="Написать"
+                      style={{
+                        width: 36,
+                        height: 36,
+                        background: 'var(--accent-primary)',
+                        color: 'white',
+                        border: 'none'
+                      }}
                     >
                       <i className="bi bi-chat-dots"></i>
                     </button>
                     <button
-                      className="btn btn-sm btn-outline-danger rounded-circle"
+                      className="btn rounded-circle d-flex align-items-center justify-content-center"
                       onClick={async () => {
                         if (window.confirm(`Удалить ${f.displayName || f.username} из друзей?`)) {
                           await removeFriend(f._id);
@@ -237,8 +358,13 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
                           await loadFriends();
                         }
                       }}
-                      style={{ width: 32, height: 32 }}
-                      title="Удалить из друзей"
+                      style={{
+                        width: 36,
+                        height: 36,
+                        background: 'var(--input-bg)',
+                        color: 'var(--text-secondary)',
+                        border: 'none'
+                      }}
                     >
                       <i className="bi bi-person-x"></i>
                     </button>
@@ -251,34 +377,48 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
 
         {activeTab === 'requests' && (
           <>
-            <div className="small text-muted fw-bold mb-2 ps-2">ВХОДЯЩИЕ ЗАЯВКИ</div>
+            <div className="small fw-bold mb-2 px-2" style={{ color: 'var(--text-secondary)' }}>
+              ВХОДЯЩИЕ ЗАЯВКИ
+            </div>
             {friendRequests.length === 0 ? (
-              <div className="text-muted text-center p-3">
+              <div className="text-center p-4" style={{ color: 'var(--text-secondary)' }}>
                 <i className="bi bi-inbox fs-1"></i>
                 <p className="mt-2">Нет заявок</p>
               </div>
             ) : (
               friendRequests.map(req => (
-                <div key={req._id} className="p-2 chat-item d-flex align-items-center rounded mb-1">
-                  <Avatar user={req} size={38} onClick={() => onOpenProfile(req)} />
-                  <div className="flex-grow-1 ms-2">
-                    <div className="fw-bold">{req.displayName || req.username}</div>
-                    <div className="small text-muted">@{req.username}</div>
+                <div key={req._id} className="chat-item d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-center gap-3" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(req)}>
+                    <Avatar user={req} size={48} />
+                    <div>
+                      <div className="fw-semibold">{req.displayName || req.username}</div>
+                      <div className="small" style={{ color: 'var(--text-muted)' }}>@{req.username}</div>
+                    </div>
                   </div>
-                  <div className="d-flex gap-1">
+                  <div className="d-flex gap-2">
                     <button 
-                      className="btn btn-sm btn-success rounded-circle" 
+                      className="btn rounded-circle d-flex align-items-center justify-content-center"
                       onClick={() => handleAcceptRequest(req._id, req.displayName || req.username)}
-                      title="Принять"
-                      style={{ width: 32, height: 32 }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        background: '#22c55e',
+                        color: 'white',
+                        border: 'none'
+                      }}
                     >
                       <i className="bi bi-check-lg"></i>
                     </button>
                     <button 
-                      className="btn btn-sm btn-danger rounded-circle" 
+                      className="btn rounded-circle d-flex align-items-center justify-content-center"
                       onClick={() => handleDeclineRequest(req._id, req.displayName || req.username)}
-                      title="Отклонить"
-                      style={{ width: 32, height: 32 }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none'
+                      }}
                     >
                       <i className="bi bi-x-lg"></i>
                     </button>
@@ -290,22 +430,13 @@ export const Sidebar = ({ chats, currentChat, openChat, createChat, onOpenGroupM
         )}
       </div>
 
-      <div className="settings-footer p-2 d-flex align-items-center justify-content-between border-top">
-        <div className="position-relative">
-          <button className="btn btn-light rounded-circle shadow-sm" onClick={() => setShowSettings(!showSettings)}>
-            <i className="bi bi-gear-fill text-secondary"></i>
-          </button>
-          {showSettings && (
-            <SettingsMenu
-              user={user}
-              theme={theme}
-              onThemeChange={changeTheme}
-              onLogout={logout}
-              onOpenProfile={() => onOpenProfile({ _id: user?.userId, username: user?.username })}
-            />
-          )}
+      {/* Нижняя панель с аватаром - убираем три точки отсюда */}
+      <div className="p-3 border-top d-flex align-items-center gap-3" style={{ borderColor: 'var(--border-color)' }}>
+        <Avatar user={{ avatarUrl: null, username: user?.username, displayName: user?.displayName }} size={40} />
+        <div>
+          <div className="small fw-semibold">{user?.displayName || user?.username}</div>
+          <div className="small" style={{ color: 'var(--text-muted)' }}>online</div>
         </div>
-        <div className="me-2 small fw-bold text-muted">@{user?.username}</div>
       </div>
     </div>
   );

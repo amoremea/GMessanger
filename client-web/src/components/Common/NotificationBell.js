@@ -1,3 +1,4 @@
+// components/Common/NotificationBell.js
 import React, { useState, useRef, useEffect } from 'react';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -18,52 +19,102 @@ export const NotificationBell = () => {
 
   const unreadCount = notifications.length;
 
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case 'friend':
+        return <i className="bi bi-person-plus-fill"></i>;
+      case 'message':
+        return <i className="bi bi-chat-dots-fill"></i>;
+      default:
+        return <i className="bi bi-bell-fill"></i>;
+    }
+  };
+
+  const getNotificationColor = (type) => {
+    switch (type) {
+      case 'friend':
+        return '#6366f1';
+      case 'message':
+        return '#06b6d4';
+      default:
+        return '#f59e0b';
+    }
+  };
+
+  const formatTime = (date) => {
+    const now = new Date();
+    const diff = now - new Date(date);
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'только что';
+    if (minutes < 60) return `${minutes} мин назад`;
+    if (hours < 24) return `${hours} ч назад`;
+    if (days === 1) return 'вчера';
+    return `${days} дн назад`;
+  };
+
   return (
-    <div className="position-relative" ref={dropdownRef}>
+    <div className="notification-container" ref={dropdownRef}>
       <button 
-        className="btn btn-light rounded-circle position-relative shadow-sm"
+        className={`notification-bell ${isOpen ? 'active' : ''} ${unreadCount > 0 ? 'has-notifications' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
-        style={{ width: 40, height: 40 }}
       >
-        <i className="bi bi-bell-fill text-secondary"></i>
+        <i className="bi bi-bell-fill"></i>
         {unreadCount > 0 && (
-          <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-            {unreadCount > 9 ? '9+' : unreadCount}
-            <span className="visually-hidden">уведомления</span>
+          <span className="notification-badge">
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="position-absolute end-0 mt-2 shadow-lg rounded bg-white" style={{ width: 320, zIndex: 1050 }}>
-          <div className="p-2 border-bottom">
-            <h6 className="mb-0 fw-bold">Уведомления</h6>
+        <div className="notification-dropdown">
+          <div className="notification-header">
+            <h6>Уведомления</h6>
+            {notifications.length > 0 && (
+              <button 
+                className="notification-clear-all"
+                onClick={() => notifications.forEach(n => removeNotification(n.id))}
+              >
+                Очистить все
+              </button>
+            )}
           </div>
-          <div className="overflow-auto" style={{ maxHeight: 400 }}>
+          
+          <div className="notification-list">
             {notifications.length === 0 ? (
-              <div className="text-center text-muted p-4">
-                <i className="bi bi-inbox fs-1"></i>
-                <p className="mt-2 mb-0">Нет уведомлений</p>
+              <div className="notification-empty">
+                <div className="notification-empty-icon">
+                  <i className="bi bi-inbox"></i>
+                </div>
+                <p>Нет уведомлений</p>
+                <span>Все уведомления будут отображаться здесь</span>
               </div>
             ) : (
               notifications.map(notif => (
-                <div key={notif.id} className="p-2 border-bottom hover-bg-light position-relative">
-                  <button 
-                    className="btn-close btn-sm position-absolute top-0 end-0 m-1"
-                    onClick={() => removeNotification(notif.id)}
-                  ></button>
-                  <div className="pe-4">
-                    <div className="d-flex align-items-center gap-2">
-                      <div className={`rounded-circle d-flex align-items-center justify-content-center bg-${notif.type === 'friend' ? 'primary' : 'info'} text-white`} style={{ width: 32, height: 32 }}>
-                        <i className={`bi bi-${notif.type === 'friend' ? 'person-plus' : 'chat-dots'}`}></i>
-                      </div>
-                      <div className="flex-grow-1">
-                        <div className="small fw-bold">{notif.title}</div>
-                        <div className="small text-muted">{notif.message}</div>
-                        <div className="small text-muted mt-1">{notif.time}</div>
-                      </div>
+                <div key={notif.id} className="notification-item">
+                  <div 
+                    className="notification-icon"
+                    style={{ background: getNotificationColor(notif.type) }}
+                  >
+                    {getNotificationIcon(notif.type)}
+                  </div>
+                  <div className="notification-content">
+                    <div className="notification-title">{notif.title}</div>
+                    <div className="notification-message">{notif.message}</div>
+                    <div className="notification-time">
+                      <i className="bi bi-clock"></i>
+                      {notif.time || formatTime(notif.createdAt)}
                     </div>
                   </div>
+                  <button 
+                    className="notification-close"
+                    onClick={() => removeNotification(notif.id)}
+                  >
+                    <i className="bi bi-x"></i>
+                  </button>
                 </div>
               ))
             )}

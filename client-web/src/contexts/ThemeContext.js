@@ -1,9 +1,16 @@
+// contexts/ThemeContext.js
 import React, { createContext, useState, useEffect } from 'react';
 
 export const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(localStorage.getItem('chat-theme') || 'theme-light');
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('chat-theme');
+    if (saved && ['theme-light', 'theme-dark', 'theme-ultra'].includes(saved)) {
+      return saved;
+    }
+    return 'theme-light';
+  });
 
   const changeTheme = (newTheme) => {
     setTheme(newTheme);
