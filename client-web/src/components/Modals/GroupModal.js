@@ -13,7 +13,7 @@ export const GroupModal = ({ onClose }) => {
   const { showError, showSuccess } = useNotification(); // ДОБАВЬТЕ
   const [groupName, setGroupName] = useState('');
   const [selectedUsers, setSelectedUsers] = useState([]);
-
+ 
   const toggleUserSelection = (userId) => {
     setSelectedUsers(prev =>
       prev.includes(userId)
